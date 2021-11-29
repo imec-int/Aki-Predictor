@@ -8,6 +8,10 @@ I'm not sure yet if we have all data for enough participants and or how ExaScien
 
 Important, our database is a postgreSQL dB, the [eicu code files](https://github.com/MIT-LCP/eicu-code/tree/master/concepts) are written for Google BigQuery, so small adaptions have to be made.
 
+* [link to MIMIC tables](https://mimic.mit.edu/docs/iii/tables/)
+* [link to MIMIC III scripts](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iii/concepts)
+* [link to eICU tables](https://eicu-crd.mit.edu/eicutables/intakeoutput/)
+* [link to eICU scripts](https://github.com/MIT-LCP/eicu-code)
 
 | AKI parameter            | category                 | MIMIC III name                              | MIMIC III location                 | eICU name  | eICU location | unit preferred |
 | ------------------------ | ------------------------ | ------------------------------------------- | ---------------------------------- | ---------- | ------------- | -------------- |
