@@ -1,9 +1,13 @@
-import psycopg2
-from sqlalchemy import create_engine
+import os
+
 import pandas as pd
+import psycopg2
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+
+load_dotenv()
 
 def test_postgres(cursor):
-
     cursor.execute("""
 SELECT
     *
@@ -22,14 +26,16 @@ AND schemaname != 'information_schema';
 
     # construct an engine connection string
     engine_string = "postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}".format(
-        user = "",
-        password = "",
-        host = "",
-        port = "",
-        database = mimicDB,
+        user=os.getenv("DATABASE_USER", "postgres"),
+        password=os.getenv("DATABASE_PASWORD", "postgres"),
+        host=os.getenv("DATABASE_HOST", "localhost"),
+        port=os.getenv("DATABASE_PORT", 5432),
+        database=os.getenv("DATABASE_NAME", "mimic"),
+        sslmode=os.getenv("DATABASE_SSL_MODE", 'disable')
     )
 
-    cmd = 'psql "postgresql+psycopg2://postgres:postgres@localhost:5432/mimic" '
+    if os.getenv("DATABASE_SSL_MODE", 'disable') == 'require':
+        engine_string = engine_string + " ?sslmode=require"
 
     # create sqlalchemy engine
     engine = create_engine(engine_string)
@@ -44,53 +50,12 @@ AND schemaname != 'information_schema';
         print("Head of extracted pandas DF:")
         print(df.head())
 
+
 def urine_output(cursor):
-        
-    view ="DROP MATERIALIZED VIEW IF EXISTS urineoutput CASCADE; \
-            CREATE MATERIALIZED VIEW urineoutput as \
-            select oe.icustay_id, oe.charttime \
-            , SUM( \
-                case when oe.itemid = 227488 then -1*value \
-                else value end \
-              ) as value \
-            from outputevents oe \
-            where oe.itemid in \
-            ( \
-              40055, \
-              43175, \
-              40069, \
-              40094, \
-              40715, \
-              40473, \
-              40085, \
-              40057, \
-              40056, \
-              40405, \
-              40428, \
-              40086, \
-              40096, \
-              40651, \
-              226559, \
-              226560, \
-              226561, \
-              226584, \
-              226563, \
-              226564, \
-              226565, \
-              226567, \
-              226557, \
-              226558, \
-              227488, \
-              227489  \
-            ) \
-            and oe.value < 5000 \
-            and oe.icustay_id is not null \
-            group by icustay_id, charttime;"
-            
-    cursor.execute(view)
+    sql_file = open(os.path.join('sql', 'mimic', 'urine_output.sql'), 'r')
+    cursor.execute(sql_file.read())
 
 def creatinine(cursor):
-    
     view = "DROP MATERIALIZED VIEW IF EXISTS kdigo_creat CASCADE; \
             CREATE MATERIALIZED VIEW kdigo_creat as \
             with cr as \
@@ -124,14 +89,14 @@ def creatinine(cursor):
               AND cr7.charttime >= (cr.charttime - INTERVAL '7' DAY) \
             GROUP BY cr.icustay_id, cr.charttime, cr.creat \
             ORDER BY cr.icustay_id, cr.charttime, cr.creat;"
-    
-    cursor.execute(view)        
+
+    cursor.execute(view)
+
 
 def weight_duration(cursor):
-    
-    #-- This query extracts weights for ICU patients with start/stop times 
-    #-- if only an admission weight is given, then this is assigned from intime to outtime 
-            
+    # -- This query extracts weights for ICU patients with start/stop times
+    # -- if only an admission weight is given, then this is assigned from intime to outtime
+
     view = " DROP MATERIALIZED VIEW IF EXISTS weightdurations CASCADE; \
             CREATE MATERIALIZED VIEW weightdurations as \
             WITH wt_neonate AS \
@@ -325,24 +290,24 @@ def weight_duration(cursor):
             from echo_final ef \
             where ef.icustay_id not in (select distinct icustay_id from wt2) \
             order by icustay_id, starttime, endtime;"
-               
+
     cursor.execute(view)
 
+
 def urine_kidigo(cursor):
-    
-#      -- we have joined each row to all rows preceding within 24 hours \
-#               -- we can now sum these rows to get total UO over the last 24 hours \
-#               -- we can use case statements to restrict it to only the last 6/12 hours \
-#               -- therefore we have three sums: \
-#               -- 1) over a 6 hour period \
-#               -- 2) over a 12 hour period \
-#               -- 3) over a 24 hour period \
-#               -- note that we assume data charted at charttime corresponds to 1 hour of UO \
-#               -- therefore we use '5' and '11' to restrict the period, rather than 6/12 \
-#               -- this assumption may overestimate UO rate when documentation is done less than hourly \
-#               -- 6 hours \
-              
-    view= " DROP MATERIALIZED VIEW IF EXISTS kdigo_uo CASCADE; \
+    #      -- we have joined each row to all rows preceding within 24 hours \
+    #               -- we can now sum these rows to get total UO over the last 24 hours \
+    #               -- we can use case statements to restrict it to only the last 6/12 hours \
+    #               -- therefore we have three sums: \
+    #               -- 1) over a 6 hour period \
+    #               -- 2) over a 12 hour period \
+    #               -- 3) over a 24 hour period \
+    #               -- note that we assume data charted at charttime corresponds to 1 hour of UO \
+    #               -- therefore we use '5' and '11' to restrict the period, rather than 6/12 \
+    #               -- this assumption may overestimate UO rate when documentation is done less than hourly \
+    #               -- 6 hours \
+
+    view = " DROP MATERIALIZED VIEW IF EXISTS kdigo_uo CASCADE; \
             CREATE MATERIALIZED VIEW kdigo_uo AS \
             with ur_stg as \
             ( \
@@ -395,14 +360,14 @@ def urine_kidigo(cursor):
               and ur.charttime >= wd.starttime \
               and ur.charttime <  wd.endtime \
             order by icustay_id, charttime; "
-            
+
     cursor.execute(view)
 
-def kidigo_7_days_creatinine(cursor): 
-   
-    #-- This query checks if the patient had AKI during the first 7 days of their ICU
-    #-- stay according to the KDIGO guideline.
-    #-- https://kdigo.org/wp-content/uploads/2016/10/KDIGO-2012-AKI-Guideline-English.pdf
+
+def kidigo_7_days_creatinine(cursor):
+    # -- This query checks if the patient had AKI during the first 7 days of their ICU
+    # -- stay according to the KDIGO guideline.
+    # -- https://kdigo.org/wp-content/uploads/2016/10/KDIGO-2012-AKI-Guideline-English.pdf
 
     view = "DROP MATERIALIZED VIEW IF EXISTS kdigo_7_days_creatinine; \
             CREATE MATERIALIZED VIEW kdigo_7_days_creatinine AS  \
@@ -433,14 +398,14 @@ def kidigo_7_days_creatinine(cursor):
               ON ie.icustay_id = cr.icustay_id  \
               AND cr.rn = 1  \
             order by ie.icustay_id; "
-            
+
     cursor.execute(view)
 
+
 def kidigo_stages_creatinine(cursor):
-    
-    #-- This query checks if the patient had AKI according to KDIGO.
-    #-- AKI is calculated every time a creatinine or urine output measurement occurs.
-    #-- Baseline creatinine is defined as the lowest creatinine in the past 7 days.
+    # -- This query checks if the patient had AKI according to KDIGO.
+    # -- AKI is calculated every time a creatinine or urine output measurement occurs.
+    # -- Baseline creatinine is defined as the lowest creatinine in the past 7 days.
 
     view = " DROP MATERIALIZED VIEW IF EXISTS kdigo_stages_creatinine CASCADE; \
             CREATE MATERIALIZED VIEW kdigo_stages_creatinine AS \
@@ -480,14 +445,14 @@ def kidigo_stages_creatinine(cursor):
               ON ie.icustay_id = cr.icustay_id \
             AND tm.charttime = cr.charttime \
             order by ie.icustay_id, tm.charttime; "
-            
+
     cursor.execute(view)
-    
-def kidigo_7_days(cursor): 
-   
-    #-- This query checks if the patient had AKI during the first 7 days of their ICU
-    #-- stay according to the KDIGO guideline.
-    #-- https://kdigo.org/wp-content/uploads/2016/10/KDIGO-2012-AKI-Guideline-English.pdf
+
+
+def kidigo_7_days(cursor):
+    # -- This query checks if the patient had AKI during the first 7 days of their ICU
+    # -- stay according to the KDIGO guideline.
+    # -- https://kdigo.org/wp-content/uploads/2016/10/KDIGO-2012-AKI-Guideline-English.pdf
 
     view = "DROP MATERIALIZED VIEW IF EXISTS kdigo_stages_7day; \
             CREATE MATERIALIZED VIEW kdigo_stages_7day AS  \
@@ -545,14 +510,14 @@ def kidigo_7_days(cursor):
               ON ie.icustay_id = uo.icustay_id  \
               AND uo.rn = 1  \
             order by ie.icustay_id; "
-            
+
     cursor.execute(view)
 
+
 def kidigo_stages(cursor):
-    
-    #-- This query checks if the patient had AKI according to KDIGO.
-    #-- AKI is calculated every time a creatinine or urine output measurement occurs.
-    #-- Baseline creatinine is defined as the lowest creatinine in the past 7 days.
+    # -- This query checks if the patient had AKI according to KDIGO.
+    # -- AKI is calculated every time a creatinine or urine output measurement occurs.
+    # -- Baseline creatinine is defined as the lowest creatinine in the past 7 days.
 
     view = " DROP MATERIALIZED VIEW IF EXISTS kdigo_stages CASCADE; \
             CREATE MATERIALIZED VIEW kdigo_stages AS \
@@ -624,18 +589,18 @@ def kidigo_stages(cursor):
               ON ie.icustay_id = uo.icustay_id \
               AND tm.charttime = uo.charttime \
             order by ie.icustay_id, tm.charttime; "
-            
+
     cursor.execute(view)
 
+
 def get_labevents(cursor):
+    # -- This query pivots lab values taken during the 7 first days of  a patient's stay
+    # -- Have already confirmed that the unit of measurement is always the same: null or the correct unit
 
-    #-- This query pivots lab values taken during the 7 first days of  a patient's stay
-    #-- Have already confirmed that the unit of measurement is always the same: null or the correct unit
+    # -- Extract all bicarbonate, blood urea nitrogen (BUN), calcium, chloride, creatinine,
+    # hemoglobin, international normalized ratio (INR), platelet, potassium, prothrombin time (PT),
+    # partial throm- boplastin time (PTT), and white blood count (WBC) values from labevents around patient's ICU stay
 
-    #-- Extract all bicarbonate, blood urea nitrogen (BUN), calcium, chloride, creatinine, 
-    #hemoglobin, international normalized ratio (INR), platelet, potassium, prothrombin time (PT), 
-    #partial throm- boplastin time (PTT), and white blood count (WBC) values from labevents around patient's ICU stay
-    
     view = "DROP MATERIALIZED VIEW IF EXISTS labstay CASCADE; \
             CREATE materialized VIEW labstay AS \
             SELECT \
@@ -776,13 +741,13 @@ def get_labevents(cursor):
             ) pvt \
             GROUP BY pvt.subject_id, pvt.hadm_id, pvt.icustay_id \
             ORDER BY pvt.subject_id, pvt.hadm_id, pvt.icustay_id;"
-     
-    cursor.execute(view) 
+
+    cursor.execute(view)
+
 
 def get_vitals_chart(cursor):
-   
-   # -- This query pivots the vital signs during the first 7 days of a patient's stay
-   #-- Vital signs include heart rate, blood pressure, respiration rate, and temperature
+    # -- This query pivots the vital signs during the first 7 days of a patient's stay
+    # -- Vital signs include heart rate, blood pressure, respiration rate, and temperature
 
     view = "DROP MATERIALIZED VIEW IF EXISTS vitalsfirstday CASCADE; \
             create materialized view vitalsfirstday as \
@@ -874,12 +839,12 @@ def get_vitals_chart(cursor):
             ) pvt \
             group by pvt.subject_id, pvt.hadm_id, pvt.icustay_id  \
             order by pvt.subject_id, pvt.hadm_id, pvt.icustay_id;"
-    
+
     cursor.execute(view)
 
+
 def get_comorbidities(cursor):
-    
-    view="DROP MATERIALIZED VIEW IF EXISTS COMORBIDITIES CASCADE; \
+    view = "DROP MATERIALIZED VIEW IF EXISTS COMORBIDITIES CASCADE; \
         CREATE MATERIALIZED VIEW COMORBIDITIES AS \
         with icd as \
         ( \
@@ -1007,56 +972,58 @@ def get_comorbidities(cursor):
         left join eligrp eli \
           on adm.hadm_id = eli.hadm_id \
         order by adm.hadm_id;"
-        
+
     cursor.execute(view)
 
+
 def count_icustays(cursor):
-    
     query = "select * from icustays"
-    cursor.execute(query) 
-    
+    cursor.execute(query)
+
     rows = cursor.fetchall()
-                 
+
+
 if __name__ == '__main__':
-    
-    mimicDB="mimic"
-    
+
     try:
-        conn = psycopg2.connect(host="localhost",
-                                user="postgres",
-                                password="postgres",
-                                database=mimicDB)
+        conn = psycopg2.connect(
+            host=os.getenv("DATABASE_HOST", "localhost"),
+            user=os.getenv("DATABASE_USER", "postgres"),
+            password=os.getenv("DATABASE_PASSWORD", "postgres"),
+            database=os.getenv("DATABASE_NAME", "mimic"),
+            sslmode=os.getenv("DATABASE_SSL_MODE", 'disable')
+        )
         cursor = conn.cursor()
-    
+
     except Exception as error:
         print(error)
-    
-    test_postgres(cursor)
-    
+
+    # test_postgres(cursor)
+
     urine_output(cursor)
     print("view urine_output created")
-        
+
     weight_duration(cursor)
     print("view weight_duration created")
-    
+
     urine_kidigo(cursor)
     print("view urine_kidigo created")
-    
+
     creatinine(cursor)
     print("view creatinine created")
-    
+
     kidigo_stages(cursor)
     print("view kidigo_stages created")
     query = "select * from kdigo_stages"
     df = pd.read_sql_query(query, conn)
     df.to_csv("AKI_KIDIGO_STAGES_SQL.csv", encoding='utf-8', header=True)
-          
+
     kidigo_7_days(cursor)
-    print("view kidigo_7_days created")     
+    print("view kidigo_7_days created")
     query = "select * from kdigo_stages_7day"
     df = pd.read_sql_query(query, conn)
     df.to_csv("AKI_KIDIGO_7D_SQL.csv", encoding='utf-8', header=True)
- 
+
     kidigo_stages_creatinine(cursor)
     print("view kidigo_stages_creatinine created")
     query = "select * from kdigo_stages_creatinine"
@@ -1064,27 +1031,27 @@ if __name__ == '__main__':
     df.to_csv("AKI_KIDIGO_STAGES_SQL_CREATININE.csv", encoding='utf-8', header=True)
 
     kidigo_7_days_creatinine(cursor)
-    print("view kidigo_7_days_creatinine created")       
+    print("view kidigo_7_days_creatinine created")
     query = "select * from kdigo_7_days_creatinine"
     df = pd.read_sql_query(query, conn)
     df.to_csv("AKI_KIDIGO_7D_SQL_CREATININE.csv", encoding='utf-8', header=True)
 
     get_labevents(cursor)
-#      
+    #
     query = "select * from labstay"
-    df = pd.read_sql_query(query, conn)   
+    df = pd.read_sql_query(query, conn)
     df.to_csv("labstay.csv", encoding='utf-8', header=True)
- 
+
     get_vitals_chart(cursor)
-     
+
     query = "select * from vitalsfirstday"
-    df = pd.read_sql_query(query, conn)   
+    df = pd.read_sql_query(query, conn)
     df.to_csv("chart_vitals_stay.csv", encoding='utf-8', header=True)
-     
+
     get_comorbidities(cursor)
-   
+
     query = "select * from COMORBIDITIES"
-    df = pd.read_sql_query(query, conn)   
+    df = pd.read_sql_query(query, conn)
     df.to_csv("comorbidities.csv", encoding='utf-8', header=True)
 
     count_icustays(cursor)
