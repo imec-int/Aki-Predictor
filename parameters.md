@@ -105,23 +105,23 @@ Important, our database is a postgreSQL dB, the [eicu code files](https://github
 
 The query is fairly large and there's serial processing of the different queries. Thus one cannot parallelize them all. Here I'll quickly indicate the dependencies:
 
-|order|sql-file|depends on other sql?|output|
-|---|---|---|---|
-|1.| [1\_urineoutput.sql](./sql/eicu/1_urineoutput.sql)| independent ||
-|2.| [2\_pivot_weigths.sql](./sql/eicu/2_pivot_weights.sql)| independent ||
-|3.| [3\_urine_kidigo.sql](./sql/eicu/3_urine_kidigo.sql)| depends on `1_urineoutput.sql` and `2_pivot_weigths.sql` ||
-|4.| [4\_creatinine.sql](./sql/eicu/4_creatinine.sql)|||
-|5.| [5\_kidigo_stages.sql](./sql/eicu/5_kidigo_stages.sql)|||
-|6.| [6\_kidigo\_7_days.sql](./sql/eicu/6_kidigo_7_days.sql)|||
-|7.| [7\_kidigo\_stages_creatinine.sql](./sql/eicu/7_kidigo_stages_creatinine.sql)|||
-|8.| [8\_kidigo\_7\_days_creatinine.sql](./sql/eicu/8_kidigo_7_days_creatinine.sql)|||
-|9.| [9\_get_labevents.sql](./sql/eicu/9_getl_labevents.sql)|||
-|10.| [10\_labstay.sql](./sql/eicu/10_labstay.sql)|||
-|11.| [11\_get_vitals.sql](./sql/eicu/11_get_vitals.sql)|||
-|12.| [12\_vitalsfirstday.sql](./sql/eicu/12_vitalsfirstday.sql)|||
-|13.| [13\_get_comorbidities.sql](./sql/eicu/13_get_comorbidities.sql)|||
-|14.| [14\_set_comorbidities.sql](./sql/eicu/14_set_comorbidities.sql)|||
-|15.| [15\_count_icustays.sql](./sql/eicu/15_count_icustays.sql)|||
+|order| sql-file                                                                      | depends on other sql?                                   | output |
+|-----|-------------------------------------------------------------------------------|---------------------------------------------------------|--------|
+|  1. | [1\_urineoutput.sql](./sql/eicu/1_urineoutput.sql)                            | independent                                             |        |
+|  2. | [2\_pivot_weigths.sql](./sql/eicu/2_pivot_weights.sql)                        | independent                                             |        |
+|  3. | [3\_urine_kidigo.sql](./sql/eicu/3_urine_kidigo.sql)                          | `1_urineoutput.sql`, `2_pivot_weigths.sql`              |        |
+|  4. | [4\_creatinine.sql](./sql/eicu/4_creatinine.sql)                              | independent                                             |        |
+|  5. | [5\_kidigo_stages.sql](./sql/eicu/5_kidigo_stages.sql)                        | `3_urine_kidigo.sql`, `4_creatinine.sql`                |        |
+|  6. | [6\_kidigo\_7_days.sql](./sql/eicu/6_kidigo_7_days.sql)                       | `5_kidigo_stages.sql`                                   |        |
+|  7. | [7\_kidigo\_stages_creatinine.sql](./sql/eicu/7_kidigo_stages_creatinine.sql) | `4_creatinine.sql`, `5_kidigo_stages.sql`               |        |
+|  8. | [8\_kidigo\_7\_days_creatinine.sql](./sql/eicu/8_kidigo_7_days_creatinine.sql)| `5_kidigo_stages.sql`, `7_kidigo_stages_creatinine.sql` |        |
+|  9. | [9\_get_labevents.sql](./sql/eicu/9_getl_labevents.sql)                       | independent                                             |        |
+| 10. | [10\_labstay.sql](./sql/eicu/10_labstay.sql)                                  | `9_get_labevents.sql`                                   |        |
+| 11. | [11\_get_vitals.sql](./sql/eicu/11_get_vitals.sql)                            | independent                                             |        |
+| 12. | [12\_vitalsfirstday.sql](./sql/eicu/12_vitalsfirstday.sql)                    | `11_get_vitals.sql`                                     |        |
+| 13. | [13\_get_comorbidities.sql](./sql/eicu/13_get_comorbidities.sql)              | independent                                             |        |
+| 14. | [14\_set_comorbidities.sql](./sql/eicu/14_set_comorbidities.sql)              | `13_get_comorbidities.sql`                              |        |
+| 15. | [15\_count_icustays.sql](./sql/eicu/15_count_icustays.sql)                    | independent                                             |        |
 	
 
 
