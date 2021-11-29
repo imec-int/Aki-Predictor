@@ -8,10 +8,6 @@ I'm not sure yet if we have all data for enough participants and or how ExaScien
 
 Important, our database is a postgreSQL dB, the [eicu code files](https://github.com/MIT-LCP/eicu-code/tree/master/concepts) are written for Google BigQuery, so small adaptions have to be made.
 
-* [link to MIMIC tables](https://mimic.mit.edu/docs/iii/tables/)
-* [link to MIMIC III scripts](https://github.com/MIT-LCP/mimic-code/tree/main/mimic-iii/concepts)
-* [link to eICU tables](https://eicu-crd.mit.edu/eicutables/intakeoutput/)
-* [link to eICU scripts](https://github.com/MIT-LCP/eicu-code)
 
 | AKI parameter            | category                 | MIMIC III name                              | MIMIC III location                 | eICU name  | eICU location | unit preferred |
 | ------------------------ | ------------------------ | ------------------------------------------- | ---------------------------------- | ---------- | ------------- | -------------- |
@@ -111,10 +107,22 @@ The query is fairly large and there's serial processing of the different queries
 
 |order|sql-file|depends on other sql?|output|
 |---|---|---|---|
-|1.| [1\_urineoutput.sql](./sql_requests/1_urineoutput.sql)| independent ||
-|2.| [2\_pivot_weigths.sql](./sql_requests/2_pivot_weights.sql)| independent ||
-|3.| [3\_urine_kidigo.sql](./sql_requests/3_urine_kidigo.sql)| depends on `1_urineoutput.sql` and `2_pivot_weigths.sql` ||
-|4.| 
+|1.| [1\_urineoutput.sql](./sql/eicu/1_urineoutput.sql)| independent ||
+|2.| [2\_pivot_weigths.sql](./sql/eicu/2_pivot_weights.sql)| independent ||
+|3.| [3\_urine_kidigo.sql](./sql/eicu/3_urine_kidigo.sql)| depends on `1_urineoutput.sql` and `2_pivot_weigths.sql` ||
+|4.| [4\_creatinine.sql](./sql/eicu/4_creatinine.sql)|||
+|5.| [5\_kidigo_stages.sql](./sql/eicu/5_kidigo_stages.sql)|||
+|6.| [6\_kidigo\_7_days.sql](./sql/eicu/6_kidigo_7_days.sql)|||
+|7.| [7\_kidigo\_stages_creatinine.sql](./sql/eicu/7_kidigo_stages_creatinine.sql)|||
+|8.| [8\_kidigo\_7\_days_creatinine.sql](./sql/eicu/8_kidigo_7_days_creatinine.sql)|||
+|9.| [9\_get_labevents.sql](./sql/eicu/9_getl_labevents.sql)|||
+|10.| [10\_labstay.sql](./sql/eicu/10_labstay.sql)|||
+|11.| [11\_get_vitals.sql](./sql/eicu/11_get_vitals.sql)|||
+|12.| [12\_vitalsfirstday.sql](./sql/eicu/12_vitalsfirstday.sql)|||
+|13.| [13\_get_comorbidities.sql](./sql/eicu/13_get_comorbidities.sql)|||
+|14.| [14\_set_comorbidities.sql](./sql/eicu/14_set_comorbidities.sql)|||
+|15.| [15\_count_icustays.sql](./sql/eicu/15_count_icustays.sql)|||
+	
 
 
 
@@ -124,7 +132,3 @@ I'd propose to save the output in .parquet files or .csv files. The latter have 
 
 ExaScience is creating multiple csv files for the MIMIC-III approach.
 
-
-
-
-`make create-user mimic datadir="../../../1.4/gz/" DBNAME="edit-ph-mimic" DBPASS="90HOtxN@^%#%CEhgGOP+" DBHOST="edit-ph-mimic.postgres.database.azure.com" DBUSER="skeletor@edit-ph-mimic"`
