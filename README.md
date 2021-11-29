@@ -31,3 +31,15 @@ The scripts contains the following functions:
 * cluster_ethnicity: subsets the data  by  ethnicity:  train  on  ”Caucasian”  (all variants),  predict  for  all  other  ethnicities.   
 * change_data_size: does random subsampling of available training data
 
+## Conda environment
+
+Included in this repository is a conda environment, listing the needed dependencies
+
+    conda env create -f environment.yml
+    conda activate aki-predictor 
+
+## Environment variable
+
+Create an .env file (based on .env.template) and fill in the variables to update the database credentials and information.
+If the .env file is missing, a database connection to localhost will be used
+
