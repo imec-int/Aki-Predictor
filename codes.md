@@ -1,11 +1,35 @@
 # codes
 
 Converted codes
-
-| sql file         | mimic III table | mimic III column | eICU table | eICU column | mimic III code(s) | eICU code(s) |
-| ---------------- | --------------- | ---------------- | ---------- | ----------- | ----------------- | ------------ |
-| 4_creatinine.sql | labevents       | ITEMID           | lab        | labName     | 50912             | creatinine   |
-
+                                  
+| sql file            | mimic III table | mimic III column | eICU table | eICU column | mimic III code(s)   | eICU code(s)     | source                                   |
+| ------------------- | --------------- | ---------------- | ---------- | ----------- | ------------------- | ---------------- | ---------------------------------------- |
+| 4_creatinine.sql    | labevents       | ITEMID           | lab        | labName     | 50912 (CREATININE)  | creatinine       |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50868 (ANION GAP)   | anion gap        |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50862 (ALBUMIN)     | albumin          |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51144 (BANDS)       | ?                |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50882 (BICARBONATE) | bicarbonate      |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50885 (BILIRUBIN)   | ?                |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50806 (CHLORIDE)    | chloride         |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50902 (CHLORIDE)    | chloride         |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50809 (GLUCOSE)     | glucose          |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50931 (GLUCOSE)     | glucose          |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50810 (HEMATOCRIT)  | Hct              | https://en.wikipedia.org/wiki/Hematocrit |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51221 (HEMATOCRIT)  | Hct              | https://en.wikipedia.org/wiki/Hematocrit |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50811 (HEMOGLOBIN)  | Hgb              | https://en.wikipedia.org/wiki/Hemoglobin |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51222 (HEMOGLOBIN)  | Hgb              | https://en.wikipedia.org/wiki/Hemoglobin |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50813 (LACTATE)     | lactate          |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51265 (PLATELET)    | platelets x 1000 |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50822 (POTASSIUM)   | potassium        |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50971 (POTASSIUM)   | potassium        |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51275 (PTT)         | PTT? PTT ratio?  |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51237 (INR)         | PT - INR?        |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51274 (PT)          | PT               |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50824 (SODIUM)      | sodium           |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 50983 (SODIUM)      | sodium           |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51006 (BUN)         | BUN              |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51300 (WBC)         | WBC x 1000?      |                                          |
+| 9_get_labevents.sql | labevents       | ITEMID           | lab        | labName     | 51301 (WBC)         | WBC x 1000?      |                                          |
 
 
 
