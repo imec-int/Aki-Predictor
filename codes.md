@@ -1,26 +1,15 @@
 # codes
 
-Converted codes
-
-| sql file         | mimic III table | mimic III column | eICU table | eICU column | mimic III code(s) | eICU code(s) |
-| ---------------- | --------------- | ---------------- | ---------- | ----------- | ----------------- | ------------ |
-| 4_creatinine.sql | labevents       | ITEMID           | lab        | labName     | 50912             | creatinine   |
-
-
-
-
-
-
 ## eICU lab#labName values
 
 `SELECT DISTINCT labName FROM eicu_crd.lab ORDER BY labName ASC`
 
-=-bands
-=-basos
-=-eos
-=-lymphs
-=-monos
-=-polys
+-bands
+-basos
+-eos
+-lymphs
+-monos
+-polys
 24 h urine protein
 24 h urine urea nitrogen
 Acetaminophen
