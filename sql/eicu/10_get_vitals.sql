@@ -4,243 +4,53 @@ DROP MATERIALIZED VIEW IF EXISTS vitalsfirstday CASCADE;
   create materialized view vitalsfirstday as  
 SELECT pvt.subject_id,
     pvt.hadm_id,
-    pvt.icustay_id  ,
-    min(
-        case
-            when VitalID = 1 then valuenum
-            else null
-        end
-    ) as HeartRate_Min  ,
-    max(
-        case
-            when VitalID = 1 then valuenum
-            else null
-        end
-    ) as HeartRate_Max  ,
-    avg(
-        case
-            when VitalID = 1 then valuenum
-            else null
-        end
-    ) as HeartRate_Mean  ,
-    min(
-        case
-            when VitalID = 2 then valuenum
-            else null
-        end
-    ) as SysBP_Min  ,
-    max(
-        case
-            when VitalID = 2 then valuenum
-            else null
-        end
-    ) as SysBP_Max  ,
-    avg(
-        case
-            when VitalID = 2 then valuenum
-            else null
-        end
-    ) as SysBP_Mean  ,
-    min(
-        case
-            when VitalID = 3 then valuenum
-            else null
-        end
-    ) as DiasBP_Min  ,
-    max(
-        case
-            when VitalID = 3 then valuenum
-            else null
-        end
-    ) as DiasBP_Max  ,
-    avg(
-        case
-            when VitalID = 3 then valuenum
-            else null
-        end
-    ) as DiasBP_Mean  ,
-    min(
-        case
-            when VitalID = 4 then valuenum
-            else null
-        end
-    ) as MeanBP_Min  ,
-    max(
-        case
-            when VitalID = 4 then valuenum
-            else null
-        end
-    ) as MeanBP_Max  ,
-    avg(
-        case
-            when VitalID = 4 then valuenum
-            else null
-        end
-    ) as MeanBP_Mean  ,
-    min(
-        case
-            when VitalID = 5 then valuenum
-            else null
-        end
-    ) as RespRate_Min  ,
-    max(
-        case
-            when VitalID = 5 then valuenum
-            else null
-        end
-    ) as RespRate_Max  ,
-    avg(
-        case
-            when VitalID = 5 then valuenum
-            else null
-        end
-    ) as RespRate_Mean  ,
-    min(
-        case
-            when VitalID = 6 then valuenum
-            else null
-        end
-    ) as TempC_Min  ,
-    max(
-        case
-            when VitalID = 6 then valuenum
-            else null
-        end
-    ) as TempC_Max  ,
-    avg(
-        case
-            when VitalID = 6 then valuenum
-            else null
-        end
-    ) as TempC_Mean  ,
-    min(
-        case
-            when VitalID = 7 then valuenum
-            else null
-        end
-    ) as SpO2_Min  ,
-    max(
-        case
-            when VitalID = 7 then valuenum
-            else null
-        end
-    ) as SpO2_Max  ,
-    avg(
-        case
-            when VitalID = 7 then valuenum
-            else null
-        end
-    ) as SpO2_Mean  ,
-    min(
-        case
-            when VitalID = 8 then valuenum
-            else null
-        end
-    ) as Glucose_Min  ,
-    max(
-        case
-            when VitalID = 8 then valuenum
-            else null
-        end
-    ) as Glucose_Max  ,
-    avg(
-        case
-            when VitalID = 8 then valuenum
-            else null
-        end
-    ) as Glucose_Mean  
+    pvt.icustay_id,
+    min(HeartRate) as HeartRate_Min,
+    max(HeartRate) as HeartRate_Max,
+    avg(HeartRate) as HeartRate_Mean,
+    min(SysBP) as SysBP_Min,
+    max(SysBP) as SysBP_Max,
+    avg(SysBP) as SysBP_Mean,
+    min(DiasBP) as DiasBP_Min,
+    max(DiasBP) as DiasBP_Max,
+    avg(DiasBP) as DiasBP_Mean,
+    min(MeanBP) as MeanBP_Min,
+    max(MeanBP) as MeanBP_Max,
+    avg(MeanBP) as MeanBP_Mean,
+    min(RespRate) as RespRate_Min,
+    max(RespRate) as RespRate_Max,
+    avg(RespRate) as RespRate_Mean,
+    min(TempC) as TempC_Min,
+    max(TempC) as TempC_Max,
+    avg(TempC) as TempC_Mean,
+    min(SpO2) as SpO2_Min,
+    max(SpO2) as SpO2_Max,
+    avg(SpO2) as SpO2_Mean,
+    NULL as Glucose_Min, --TODO glucose
+    NULL as Glucose_Max, --TODO glucose
+    NULL as Glucose_Mean --TODO glucose
 FROM (
          
-        select ie.subject_id,
-            ie.hadm_id,
-            ie.icustay_id  ,
-            case
-                 
-                when itemid in (211, 220045)
-                and valuenum > 0
-                and valuenum < 300 then 1  
-                when itemid in (51, 442, 455, 6701, 220179, 220050)
-                and valuenum > 0
-                and valuenum < 400 then 2  
-                when itemid in (8368, 8440, 8441, 8555, 220180, 220051)
-                and valuenum > 0
-                and valuenum < 300 then 3  
-                when itemid in (456, 52, 6702, 443, 220052, 220181, 225312)
-                and valuenum > 0
-                and valuenum < 300 then 4  
-                when itemid in (615, 618, 220210, 224690)
-                and valuenum > 0
-                and valuenum < 70 then 5  
-                when itemid in (223761, 678)
-                and valuenum > 70
-                and valuenum < 120 then 6  
-                when itemid in (223762, 676)
-                and valuenum > 10
-                and valuenum < 50 then 6  
-                when itemid in (646, 220277)
-                and valuenum > 0
-                and valuenum <= 100 then 7  
-                when itemid in (807, 811, 1529, 3745, 3744, 225664, 220621, 226537)
-                and valuenum > 0 then 8  
-                else null
-            end as VitalID  ,
-            case
-                when itemid in (223761, 678) then (valuenum -32) / 1.8
-                else valuenum
-            end as valuenum  
-        from icustays ie  
-            left join chartevents ce   on ie.subject_id = ce.subject_id
-            and ie.hadm_id = ce.hadm_id
-            and ie.icustay_id = ce.icustay_id  
-            and ce.charttime between ie.intime - interval '6' hour
-            and ie.intime + interval '7' day  
-            and ce.error IS DISTINCT
-        FROM 1  
-        where ce.itemid in   (
-                  211,
-                  220045,
-                  51,
-                  442,
-                  455,
-                  6701,
-                  220179,
-                  220050,
-                  8368,
-                  8440,
-                  8441,
-                  8555,
-                  220180,
-                  220051,
-                  456,
-                  52,
-                  6702,
-                  443,
-                  220052,
-                  220181,
-                  225312,
-                  618,
-                  615,
-                  220210,
-                  224690,
-                  646,
-                220277,
-                  807,
-                  811,
-                  1529,
-                  3745,
-                  3744,
-                  225664,
-                  220621,
-                  226537,
-                  223762,
-                  676,
-                  223761,
-                  678  
-            )  
+        SELECT ie.patientHealthSystemStayID AS subject_id, -- in eICU only hospital stays are identified, not patients
+            ie.patientHealthSystemStayID AS hadm_id,
+            ie.patientUnitStayID AS icustay_id,
+            ce.heartRate AS HeartRate,
+            ce.systemicSystolic AS SysBP,
+            ce.systemicDiastolic AS DiasBP,
+            ce.systemicMean AS MeanBP,
+            ce.respiration AS RespRate,
+            ce.temperature AS TempC,
+            ce.saO2 AS SpO2, -- this is actually not correct, but close enough
+            --TODO glucose from lab?
+        FROM patient ie
+            LEFT JOIN vitalsperiodic ce ON ie.patientUnitStayID = ce.patientUnitStayID
+                                          --AND ce.hadm_id = ie.hadm_id not needed, patientUnitStayID is enough
+                                          --and anyStayOfPat.patientUnitStayID = ce.patientUnitStayID
+                                          AND ce.observationOffset between -6*60
+                                                                       and 7*24*60
+                                          --and ce.error IS DISTINCT
+                                          --             FROM 1
+        --where ce.itemid in (...) in eICU columns are used to differentiate between signals instead of using multiple key-value rows
     ) pvt  
-group by pvt.subject_id,
-    pvt.hadm_id,
-    pvt.icustay_id  
-order by pvt.subject_id,
-    pvt.hadm_id,
-    pvt.icustay_id;
+GROUP BY pvt.subject_id, pvt.hadm_id, pvt.icustay_id  
+ORDER BY pvt.subject_id, pvt.hadm_id, pvt.icustay_id;

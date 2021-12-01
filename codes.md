@@ -261,3 +261,69 @@ ORDER BY label, valueuom
 | 51300  | WBC Count              |  K/uL    | 2371   |
 | 51301  | White Blood Cells      |  K/uL    | 753203 |
 | 51301  | White Blood Cells      |          | 18     |
+
+## get_vitals Vitals codes
+
+Queried signals (number is VitalId):
+1. HeartRate
+2. SysBP: systolic blood pressure
+3. DiasBP: diastolic blood pressure
+4. MeanBP: mean blood pressure
+5. RespRate
+6. TempC
+7. SpO2: peripheral oxygen saturation
+  - is not the same as SaO2 which is arterial oxygen saturation, see https://pediaa.com/what-is-the-difference-between-sao2-and-spo2/
+8. Glucose
+
+```
+SELECT itemid, label, unitname
+FROM mimiciii.d_items
+WHERE itemid IN (
+        211, 220045, 51, 442, 455, 6701, 220179, 220050, 8368, 8440, 8441, 8555, 220180, 220051, 456, 52, 6702,
+		443, 220052, 220181, 225312, 618, 615, 220210, 224690, 646, 220277, 807, 811, 1529, 3745, 3744, 225664,
+		220621, 226537, 223762, 676, 223761, 678  
+)
+ORDER BY label
+```
+
+| itemid | label                                 | unitname | VitalID     |
+|--------|---------------------------------------|----------|-------------|
+| 220045 | Heart Rate                            | bpm      | 1 HeartRate |
+| 211    | Heart Rate                            |          | 1 HeartRate |
+| 220050 | Arterial Blood Pressure systolic      | mmHg     | 2 SysBP     |
+| 6701   | Arterial BP #2 [Systolic]             |          | 2 SysBP     |
+| 51     | Arterial BP [Systolic]                |          | 2 SysBP     |
+| 220179 | Non Invasive Blood Pressure systolic  | mmHg     | 2 SysBP     |
+| 455    | NBP [Systolic]                        |          | 2 SysBP     |
+| 442    | Manual BP [Systolic]                  |          | 2 SysBP     |
+| 220051 | Arterial Blood Pressure diastolic     | mmHg     | 3 DiasBP    |
+| 8555   | Arterial BP #2 [Diastolic]            |          | 3 DiasBP    |
+| 8368   | Arterial BP [Diastolic]               |          | 3 DiasBP    |
+| 8441   | NBP [Diastolic]                       |          | 3 DiasBP    |
+| 220180 | Non Invasive Blood Pressure diastolic | mmHg     | 3 DiasBP    |
+| 8440   | Manual BP [Diastolic]                 |          | 3 DiasBP    |
+| 225312 | ART BP mean                           | mmHg     | 4 MeanBP    |
+| 220052 | Arterial Blood Pressure mean          | mmHg     | 4 MeanBP    |
+| 52     | Arterial BP Mean                      |          | 4 MeanBP    |
+| 6702   | Arterial BP Mean #2                   |          | 4 MeanBP    |
+| 443    | Manual BP Mean(calc)                  |          | 4 MeanBP    |
+| 456    | NBP Mean                              |          | 4 MeanBP    |
+| 220181 | Non Invasive Blood Pressure mean      | mmHg     | 4 MeanBP    |
+| 615    | Resp Rate (Total)                     |          | 5 RespRate  |
+| 618    | Respiratory Rate                      |          | 5 RespRate  |
+| 220210 | Respiratory Rate                      | insp/min | 5 RespRate  |
+| 224690 | Respiratory Rate (Total)              | insp/min | 5 RespRate  |
+| 676    | Temperature C                         |          | 6 TempC     |
+| 223762 | Temperature Celsius                   | ?C       | 6 TempC     |
+| 678    | Temperature F                         |          | 6 TempC     |
+| 223761 | Temperature Fahrenheit                | ?F       | 6 TempC     |
+| 220277 | O2 saturation pulseoxymetry           | %        | 7 SpO2      |
+| 646    | SpO2                                  |          | 7 SpO2      |
+| 3744   | Blood Glucose                         |          | 8 Glucose   |
+| 3745   | BloodGlucose                          |          | 8 Glucose   |
+| 807    | Fingerstick Glucose                   |          | 8 Glucose   |
+| 1529   | Glucose                               |          | 8 Glucose   |
+| 811    | Glucose (70-105)                      |          | 8 Glucose   |
+| 220621 | Glucose (serum)                       | None     | 8 Glucose   |
+| 226537 | Glucose (whole blood)                 | None     | 8 Glucose   |
+| 225664 | Glucose finger stick                  | None     | 8 Glucose   |
