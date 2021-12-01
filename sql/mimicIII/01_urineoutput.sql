@@ -1,5 +1,6 @@
 DROP MATERIALIZED VIEW IF EXISTS urineoutput CASCADE;
 CREATE MATERIALIZED VIEW urineoutput as
+
 select oe.icustay_id,
     oe.charttime,
     SUM(

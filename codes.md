@@ -1,5 +1,4 @@
 # codes
-
 ## eICU lab#labName values
 
 `SELECT DISTINCT labName FROM eicu_crd.lab ORDER BY labName ASC`
