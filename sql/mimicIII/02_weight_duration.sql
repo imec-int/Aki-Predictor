@@ -192,7 +192,7 @@ echo_lag as (
             ORDER BY ec.charttime
         ) as endtime
     from icustays ie
-        inner join echodata ec on ie.hadm_id = ec.hadm_id
+        inner join echo_data ec on ie.hadm_id = ec.hadm_id
     where ec.weight is not null
 ),
 echo_final as (
