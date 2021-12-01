@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import dotenv
 from sqlalchemy import create_engine
 from pathlib import Path
+import argparse
 
 
 def test_postgres(cursor):
@@ -69,14 +70,13 @@ def save_sql(conn, sql_path, save_path):
         sql_file = open(os.path.join(sql_path, i), 'r')
         # cursor.execute(sql_file.read())
         df = pd.read_sql_query(sql_file.read(), conn)
-        df.to_csv(os.path.join(save_path, filename+".csv"),
-                  encoding='utf-8', header=True)
+        # df.to_csv(os.path.join(save_path, filename+".csv"),
+        #           encoding='utf-8', header=True)
+        df.to_parquet(path=os.path.join(save_path, filename+".parquet"))
 
 
-if __name__ == '__main__':
-    dbname = 'mimiciii'  # 'eicu'
-
-    load_dotenv()
+def run(dbname):
+    print(dbname)
     # MIMIC
     if(dbname == 'mimiciii'):
         print("we're accessing the MIMIC-III dB")
@@ -90,7 +90,6 @@ if __name__ == '__main__':
                 options=f'-c search_path=mimiciii,public'
             )
             cursor = conn.cursor()
-
         except Exception as error:
             print(error)
     else:
@@ -106,7 +105,6 @@ if __name__ == '__main__':
                 options=f'-c search_path=eicu_crd,public'
             )
             cursor = conn.cursor()
-
         except Exception as error:
             print(error)
 
@@ -115,3 +113,15 @@ if __name__ == '__main__':
     execute_sql(cursor, path=Path.cwd() / 'sql' / dbname)
     save_sql(conn, sql_path=Path.cwd() / 'sql' / 'save',
              save_path=Path.cwd() / 'output' / dbname)
+
+
+if __name__ == '__main__':
+    dbname_constant = 'eicu' # in case of no python arguments
+
+    load_dotenv()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dbname", type=str, help="choose database name: eicu or mimiciii", choices=[
+                        'eicu', 'mimiciii'])
+    args = parser.parse_args()
+
+    run(dbname=args.dbname) if args.dbname else run(dbname=dbname_constant)
