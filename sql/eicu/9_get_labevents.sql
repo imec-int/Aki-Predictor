@@ -237,134 +237,131 @@ SELECT pvt.subject_id,
         end
     ) as WBC_max
 FROM (
-        SELECT ie.subject_id,
-            ie.hadm_id,
-            ie.icustay_id,
+        SELECT ie.patientHealthSystemStayID AS subject_id, -- in eICU only hospital stays are identified, not patients
+            ie.patientHealthSystemStayID AS hadm_id,
+            ie.patientUnitStayID AS icustay_id,
             CASE
-                WHEN itemid = 50868 THEN 'ANION GAP'
-                WHEN itemid = 50862 THEN 'ALBUMIN'
-                WHEN itemid = 51144 THEN 'BANDS'
-                WHEN itemid = 50882 THEN 'BICARBONATE'
-                WHEN itemid = 50885 THEN 'BILIRUBIN'
-                WHEN itemid = 50912 THEN 'CREATININE'
-                WHEN itemid = 50806 THEN 'CHLORIDE'
-                WHEN itemid = 50902 THEN 'CHLORIDE'
-                WHEN itemid = 50809 THEN 'GLUCOSE'
-                WHEN itemid = 50931 THEN 'GLUCOSE'
-                WHEN itemid = 50810 THEN 'HEMATOCRIT'
-                WHEN itemid = 51221 THEN 'HEMATOCRIT'
-                WHEN itemid = 50811 THEN 'HEMOGLOBIN'
-                WHEN itemid = 51222 THEN 'HEMOGLOBIN'
-                WHEN itemid = 50813 THEN 'LACTATE'
-                WHEN itemid = 51265 THEN 'PLATELET'
-                WHEN itemid = 50822 THEN 'POTASSIUM'
-                WHEN itemid = 50971 THEN 'POTASSIUM'
-                WHEN itemid = 51275 THEN 'PTT'
-                WHEN itemid = 51237 THEN 'INR'
-                WHEN itemid = 51274 THEN 'PT'
-                WHEN itemid = 50824 THEN 'SODIUM'
-                WHEN itemid = 50983 THEN 'SODIUM'
-                WHEN itemid = 51006 THEN 'BUN'
-                WHEN itemid = 51300 THEN 'WBC'
-                WHEN itemid = 51301 THEN 'WBC'
+                WHEN labName = 'anion gap' THEN 'ANION GAP'
+                WHEN labName = 'albumin' THEN 'ALBUMIN'
+                WHEN labName = '-bands' THEN 'BANDS'
+                WHEN labName = 'bicarbonate' THEN 'BICARBONATE'
+                WHEN labName = 'total bilirubin' THEN 'BILIRUBIN'
+                WHEN labName = 'creatinine' THEN 'CREATININE'
+                WHEN labName = 'chloride' THEN 'CHLORIDE'
+                --WHEN labName = 'chloride' THEN 'CHLORIDE'
+                WHEN labName = 'glucose' THEN 'GLUCOSE'
+                --WHEN labName = 'glucose' THEN 'GLUCOSE'
+                WHEN labName = 'Hct' THEN 'HEMATOCRIT'
+                --WHEN labName = 'Hct' THEN 'HEMATOCRIT'
+                WHEN labName = 'Hgb' THEN 'HEMOGLOBIN'
+                --WHEN labName = 'Hgb' THEN 'HEMOGLOBIN'
+                WHEN labName = 'lactate' THEN 'LACTATE'
+                WHEN labName = 'platelets x 1000' THEN 'PLATELET'
+                WHEN labName = 'potassium' THEN 'POTASSIUM'
+                --WHEN labName = 'potassium' THEN 'POTASSIUM'
+                WHEN labName = 'PTT' THEN 'PTT'
+                WHEN labName = 'PT - INR' THEN 'INR'
+                WHEN labName = 'PT' THEN 'PT'
+                WHEN labName = 'sodium' THEN 'SODIUM'
+                -- WHEN labName = 'sodium' THEN 'SODIUM'
+                WHEN labName = 'BUN' THEN 'BUN'
+                WHEN labName = 'WBC x 1000' THEN 'WBC'
+                --WHEN labName = 'WBC x 1000' THEN 'WBC'
                 ELSE null
             END AS label,
             CASE
-                WHEN itemid = 50862
-                and valuenum > 10 THEN null
-                WHEN itemid = 50868
-                and valuenum > 10000 THEN null
-                WHEN itemid = 51144
-                and valuenum < 0 THEN null
-                WHEN itemid = 51144
-                and valuenum > 100 THEN null
-                WHEN itemid = 50882
-                and valuenum > 10000 THEN null
-                WHEN itemid = 50885
-                and valuenum > 150 THEN null
-                WHEN itemid = 50806
-                and valuenum > 10000 THEN null
-                WHEN itemid = 50902
-                and valuenum > 10000 THEN null
-                WHEN itemid = 50912
-                and valuenum > 150 THEN null
-                WHEN itemid = 50809
-                and valuenum > 10000 THEN null
-                WHEN itemid = 50931
-                and valuenum > 10000 THEN null
-                WHEN itemid = 50810
-                and valuenum > 100 THEN null
-                WHEN itemid = 51221
-                and valuenum > 100 THEN null
-                WHEN itemid = 50811
-                and valuenum > 50 THEN null
-                WHEN itemid = 51222
-                and valuenum > 50 THEN null
-                WHEN itemid = 50813
-                and valuenum > 50 THEN null
-                WHEN itemid = 51265
-                and valuenum > 10000 THEN null
-                WHEN itemid = 50822
-                and valuenum > 30 THEN null
-                WHEN itemid = 50971
-                and valuenum > 30 THEN null
-                WHEN itemid = 51275
-                and valuenum > 150 THEN null
-                WHEN itemid = 51237
-                and valuenum > 50 THEN null
-                WHEN itemid = 51274
-                and valuenum > 150 THEN null
-                WHEN itemid = 50824
-                and valuenum > 200 THEN null
-                WHEN itemid = 50983
-                and valuenum > 200 THEN null
-                WHEN itemid = 51006
-                and valuenum > 300 THEN null
-                WHEN itemid = 51300
-                and valuenum > 1000 THEN null
-                WHEN itemid = 51301
-                and valuenum > 1000 THEN null
-                ELSE le.valuenum
+                WHEN labName = 'albumin' --50862
+                 and labResult > 10 THEN null
+                WHEN labName = 'anion gap' --50868
+                 and labResult > 10000 THEN null
+                WHEN labName = '-bands' --51144
+                 and labResult < 0 THEN null
+                WHEN labName = '-bands' --51144
+                 and labResult > 100 THEN null
+                WHEN labName = 'bicarbonate' --50882
+                 and labResult > 10000 THEN null
+                WHEN labName = 'total bilirubin' --50885
+                 and labResult > 150 THEN null
+                WHEN labName = 'chloride' --50806
+                 and labResult > 10000 THEN null
+                -- also chloride WHEN labName = 50902
+                -- also chloride  and labResult > 10000 THEN null
+                WHEN labName = 'creatinine' --50912
+                 and labResult > 150 THEN null
+                WHEN labName = 'glucose' --50809
+                 and labResult > 10000 THEN null
+                -- also glucose WHEN labName = 50931
+                -- also glucose  and labResult > 10000 THEN null
+                WHEN labName = 'Hct' --50810
+                 and labResult > 100 THEN null
+                -- also Hct WHEN labName = 51221
+                -- also Hct  and labResult > 100 THEN null
+                WHEN labName = 'Hgb' --50811
+                 and labResult > 50 THEN null
+                -- also Hgb WHEN labName = 51222
+                -- also Hgb  and labResult > 50 THEN null
+                WHEN labName = 'lactate' --50813
+                 and labResult > 50 THEN null
+                WHEN labName = 'platelets x 1000' --51265
+                 and labResult > 10000 THEN null
+                WHEN labName = 'potassium' --50822
+                 and labResult > 30 THEN null
+                -- also potassium WHEN labName = 50971
+                -- also potassium  and labResult > 30 THEN null
+                WHEN labName = 'PTT' --51275
+                 and labResult > 150 THEN null
+                WHEN labName = 'PT - INR' --51237
+                 and labResult > 50 THEN null
+                WHEN labName = 'PT' --51274
+                 and labResult > 150 THEN null
+                WHEN labName = 'sodium' --50824
+                 and labResult > 200 THEN null
+                -- also sodium WHEN labName = 50983
+                -- also sodium  and labResult > 200 THEN null
+                WHEN labName = 'BUN' --51006
+                 and labResult > 300 THEN null
+                WHEN labName = 'WBC x 1000' --51300
+                 and labResult > 1000 THEN null
+                -- also WCB x 1000 WHEN labName = 51301
+                -- also WCB x 1000  and labResult > 1000 THEN null
+                ELSE le.labResult
             END AS valuenum
-        FROM icustays ie
-            LEFT JOIN labevents le ON le.subject_id = ie.subject_id
-            AND le.hadm_id = ie.hadm_id
-            AND le.CHARTTIME between (ie.intime - interval '6' hour)
-            and (ie.intime + interval '7' day)
-            AND le.ITEMID in (
-                50868,
-                50862,
-                51144,
-                50882,
-                50885,
-                50912,
-                50902,
-                50806,
-                50931,
-                50809,
-                51221,
-                50810,
-                51222,
-                50811,
-                50813,
-                51265,
-                50971,
-                50822,
-                51275,
-                51237,
-                51274,
-                50983,
-                50824,
-                51006,
-                51301,
-                51300
-            )
-            AND valuenum IS NOT null
-            AND valuenum > 0
+        FROM patient ie
+            LEFT JOIN patient anyStayOfPat ON ie.patientHealthSystemStayID = anyStayOfPat.patientHealthSystemStayID -- in mimic we can group data on a patient level, here we can only group on a hospital stay level
+            LEFT JOIN lab le ON anyStayOfPat.patientUnitStayID = le.patientUnitStayID -- mimic doesn't associate lab events to unit stays, so we also select lab data from all unit stays of the patient
+                                --AND le.hadm_id = ie.hadm_id not needed, patientUnitStayID is enough
+                                AND le.labResultOffset - anyStayOfPat.hospitalAdmitOffset between -6*60-ie.hospitalAdmitOffset
+                                                                                              and 7*24*60-ie.hospitalAdmitOffset -- correct for the time difference (base for the labResultOffset) between the 'ie' stay and anyStayOfPat
+                                AND le.labName in (
+                                    'anion gap',        --50868,
+                                    'albumin',          --50862,
+                                    '-bands',           --51144,
+                                    'bicarbonate',      --50882,
+                                    'total bilirubin',  --50885,
+                                    'creatinine',       --50912,
+                                    'chloride',         --50902,
+                                    -- also 'chloride'    50806,
+                                    'glucose',          --50931,
+                                    -- also 'glucose'     50809,
+                                    'Hct',              --51221,
+                                    -- also 'Hct'         50810,
+                                    'Hgb',              --51222,
+                                    -- also 'Hgb'         50811,
+                                    'lactate',          --50813,
+                                    'platelets x 1000', --51265,
+                                    'potassium',        --50971,
+                                    -- also 'potassium'   50822,
+                                    'PTT',              --51275,
+                                    'PT - INR',         --51237,
+                                    'PT',               --51274,
+                                    'sodium',           --50983,
+                                    -- also 'sodium'      50824,
+                                    'BUN',              --51006,
+                                    'WBC x 1000'        --51301,
+                                    -- also 'WBC x 1000'  51300
+                                )
+                                AND le.labResult IS NOT null
+                                AND le.labResult > 0
     ) pvt
-GROUP BY pvt.subject_id,
-    pvt.hadm_id,
-    pvt.icustay_id
-ORDER BY pvt.subject_id,
-    pvt.hadm_id,
-    pvt.icustay_id;
+GROUP BY pvt.subject_id, pvt.hadm_id, pvt.icustay_id
+ORDER BY pvt.subject_id, pvt.hadm_id, pvt.icustay_id;
