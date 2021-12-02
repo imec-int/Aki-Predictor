@@ -1,1 +1,2 @@
-query = "select * from kdigo_stages"
+select *
+from kdigo_stages

@@ -1,7 +1,6 @@
 -- DROP TABLE IF EXISTS urineoutput CASCADE;
 -- CREATE TABLE pivoted_uo AS 
 DROP MATERIALIZED VIEW IF EXISTS urineoutput CASCADE;
-set search_path = 'eicu_crd', 'public'
 
 CREATE MATERIALIZED VIEW urineoutput as
 with uo as (
@@ -163,7 +162,7 @@ with uo as (
             when cellpath like 'flowsheet|Flowsheet Cell Labels|I&O|Output (ml)|Urinary Catheter Output%' then 1
             else 0
         END as cellpath_is_uo
-    from eicu_crd.intakeoutput
+    from intakeoutput
 )
 select patientunitstayid,
     intakeoutputoffset as chartoffset,

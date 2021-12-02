@@ -1,1 +1,1 @@
-query = "select * from kdigo_stages_7day"
+select * from kdigo_stages_7day
