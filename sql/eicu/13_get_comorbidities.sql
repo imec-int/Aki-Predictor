@@ -1,14 +1,15 @@
 DROP MATERIALIZED VIEW IF EXISTS COMORBIDITIES CASCADE;
 CREATE MATERIALIZED VIEW COMORBIDITIES AS with icd as (
-    select hadm_id,
-        seq_num,
-        icd9_code
-    from diagnoses_icd
-    where seq_num != 1
+    select ha.patientHealthSystemStayID AS hadm_id,
+        -- seq_num, not used
+        icd9code AS icd9_code
+    from diagnoses d
+         join patient ha USING (patientUnitStayID)
+    where diagnosisPriority != 'Primary'
 ),
 eliflg as (
     select hadm_id,
-        seq_num,
+        -- seq_num, not used
         icd9_code,
         CASE
             when icd9_code in (
@@ -327,6 +328,6 @@ select adm.hadm_id,
     obese as OBESITY,
     alcohol as ALCOHOL_ABUSE,
     drug as DRUG_ABUSE
-from admissions adm
-    left join eligrp eli on adm.hadm_id = eli.hadm_id
+from patient adm
+    left join eligrp eli on adm.patientHealthSystemStayID = eli.hadm_id
 order by adm.hadm_id;
