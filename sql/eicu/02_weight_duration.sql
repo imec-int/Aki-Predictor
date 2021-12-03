@@ -1,8 +1,15 @@
-DROP MATERIALIZED VIEW IF EXISTS weightdurations CASCADE;
-CREATE MATERIALIZED VIEW weightdurations as
-WITH htwt as (
+-- weight duration
+
+-- TODO I think we could expand this sql and find more weight data in the dataset
+-- TODO also, we note down different timestamps, right now I think the most important is the entry and exit from the ICU (icu_times)
+-- TODO starttime of intakeoutput should be offsetted with the starttime of <some?> patient starttimes?
+-- DROP MATERIALIZED VIEW IF EXISTS weightdurations CASCADE;
+-- CREATE MATERIALIZED VIEW weightdurations as 
+WITH 
+htwt as (
     SELECT patientunitstayid,
-        hospitaladmitoffset as chartoffset,
+        hospitaladmitoffset as starttime, -- entry in the ICU
+        unitDischargeOffset as endtime,
         admissionheight as height,
         admissionweight as weight,
         CASE
@@ -12,11 +19,12 @@ WITH htwt as (
             AND admissionheight <= 100
             AND abs(admissionheight - admissionweight) >= 20 THEN 'swap'
         END AS method
-    FROM patient
+    FROM eicu_crd.patient
 ),
 htwt_fixed as (
     SELECT patientunitstayid,
-        chartoffset,
+        starttime,
+        endtime,
         'admit' as weight_type,
         CASE
             WHEN method = 'swap' THEN weight
@@ -49,23 +57,23 @@ htwt_fixed as (
 --             ) THEN 'admit'
 --             ELSE 'daily'
 --         END AS weight_type,
-        -- CAST(nursingchartvalue as NUMERIC) as weight --todo invalid input syntax for type numeric: ""
-    --     nursingchartvalue as weight
-    -- from eicu_crd.nursecharting
-    -- where nursingchartcelltypecat = 'Other Vital Signs and Infusions'
-        -- and nursingchartcelltypevallabel in ( --todo returns 0 rows :s
-        --     'Admission Weight', 
-        --     'Admit weight',
-        --     'WEIGHT in Kg'
-        -- ) -- ensure that nursingchartvalue is numeric
-        -- and nursingchartvalue ~ '^([0-9]+\.?[0-9]*|\.[0-9]+)$' --todo
-        -- and nursingchartoffset < 60 * 24 --todo
+-- CAST(nursingchartvalue as NUMERIC) as weight --todo invalid input syntax for type numeric: ""
+--     nursingchartvalue as weight
+-- from eicu_crd.nursecharting
+-- where nursingchartcelltypecat = 'Other Vital Signs and Infusions'
+-- and nursingchartcelltypevallabel in ( --todo returns 0 rows :s
+--     'Admission Weight', 
+--     'Admit weight',
+--     'WEIGHT in Kg'
+-- ) -- ensure that nursingchartvalue is numeric
+-- and nursingchartvalue ~ '^([0-9]+\.?[0-9]*|\.[0-9]+)$' --todo
+-- and nursingchartoffset < 60 * 24 --todo
 -- ) -- weight from intake/output table
-
 ,
 wt2 as (
     select patientunitstayid,
-        intakeoutputoffset as chartoffset,
+        intakeoutputoffset as starttime, -- when intake values are noted in the ICU, I expect this to be > patient.chartoffset
+        cast(null as INTEGER) as endtime,
         'daily' as weight_type,
         MAX(
             CASE
@@ -80,7 +88,7 @@ wt2 as (
                 else NULL
             END
         ) AS weight_kg2
-    FROM intakeoutput
+    FROM eicu_crd.intakeoutput
     WHERE CELLPATH IN (
             'flowsheet|Flowsheet Cell Labels|I&O|Weight|Bodyweight (kg)',
             'flowsheet|Flowsheet Cell Labels|I&O|Weight|Bodyweight (lb)'
@@ -88,22 +96,22 @@ wt2 as (
         and INTAKEOUTPUTOFFSET < 60 * 24
     GROUP BY patientunitstayid,
         intakeoutputoffset
-) 
+)
 -- weight from infusiondrug
 -- ,
 -- wt3 as ( --todo also empty query...
-    -- select patientunitstayid,
-    --     infusionoffset as chartoffset,
-    --     'daily' as weight_type,
-    --     cast(patientweight as NUMERIC) as weight
-    -- from eicu_crd.infusiondrug
-    -- where patientweight is not null
-    --     and infusionoffset < 60 * 24
+-- select patientunitstayid,
+--     infusionoffset as chartoffset,
+--     'daily' as weight_type,
+--     cast(patientweight as NUMERIC) as weight
+-- from eicu_crd.infusiondrug
+-- where patientweight is not null
+--     and infusionoffset < 60 * 24
 -- ) 
-
--- combine together all weights
+-- combine together all weights  
 SELECT patientunitstayid,
-    chartoffset,
+    starttime,
+    endtime,
     'patient' as source_table,
     weight_type,
     weight_fixed as weight
@@ -119,21 +127,21 @@ UNION ALL
 -- WHERE weight IS NOT NULL
 -- UNION ALL
 SELECT patientunitstayid,
-    chartoffset,
+    starttime,
+    endtime,
     'intakeoutput' as source_table,
     weight_type,
     COALESCE(weight_kg, weight_kg2) as weight
 FROM wt2
 WHERE weight_kg IS NOT NULL
-    OR weight_kg2 IS NOT NULL
--- UNION ALL
--- SELECT patientunitstayid,
---     chartoffset,
---     'infusiondrug' as source_table,
---     weight_type,
---     weight
--- FROM wt3
--- WHERE weight IS NOT NULL
+    OR weight_kg2 IS NOT NULL -- UNION ALL
+    -- SELECT patientunitstayid,
+    --     chartoffset,
+    --     'infusiondrug' as source_table,
+    --     weight_type,
+    --     weight
+    -- FROM wt3
+    -- WHERE weight IS NOT NULL
 ORDER BY 1,
     2,
     3;
