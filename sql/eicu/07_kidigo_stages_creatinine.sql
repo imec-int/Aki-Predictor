@@ -25,14 +25,14 @@ tm_stg AS (
         charttime
     FROM cr_stg
 )
-select ie.icustay_id,
+select ie.patientUnitStayID AS icustay_id,
     tm.charttime,
     cr.creat,
     cr.aki_stage_creat,
     cr.aki_stage_creat AS aki_stage
-FROM icustays ie
-    LEFT JOIN tm_stg tm ON ie.icustay_id = tm.icustay_id
-    LEFT JOIN cr_stg cr ON ie.icustay_id = cr.icustay_id
+FROM patient ie
+    LEFT JOIN tm_stg tm ON ie.patientUnitStayID = tm.icustay_id
+    LEFT JOIN cr_stg cr ON ie.patientUnitStayID = cr.icustay_id
     AND tm.charttime = cr.charttime
-order by ie.icustay_id,
+order by ie.patientUnitStayID,
     tm.charttime;
