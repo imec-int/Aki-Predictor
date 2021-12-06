@@ -12,13 +12,13 @@ CREATE MATERIALIZED VIEW kdigo_7_days_creatinine AS WITH cr_aki AS (
             ORDER BY k.aki_stage_creat DESC,
                 k.creat DESC
         ) AS rn
-    FROM icustays ie
-        INNER JOIN kdigo_stages_creatinine k ON ie.icustay_id = k.icustay_id
-    WHERE k.charttime > (ie.intime - interval '6' hour)
-        AND k.charttime <= (ie.intime + interval '7' day)
+    FROM patient ie
+        INNER JOIN kdigo_stages_creatinine k ON ie.patientUnitStayID = k.icustay_id
+    WHERE k.charttime > - 6*60 - ie.hospitalAdmitOffset -- assuming kdigo_stage_creatinine.charttime is also relative to hospital admission and in minutes
+        AND k.charttime <= 7*24*60 - ie.hospitalAdmitOffset
         AND k.aki_stage_creat IS NOT NULL
 )
-select ie.icustay_id,
+select ie.patientUnitStayID AS icustay_id,
     cr.charttime as charttime_creat,
     cr.creat,
     cr.aki_stage_creat,
@@ -27,7 +27,7 @@ select ie.icustay_id,
         WHEN (cr.aki_stage_creat > 0) THEN 1
         ELSE 0
     END AS aki_7day
-FROM icustays ie
-    LEFT JOIN cr_aki cr ON ie.icustay_id = cr.icustay_id
+FROM patient ie
+    LEFT JOIN cr_aki cr ON ie.patientUnitStayID = cr.icustay_id
     AND cr.rn = 1
-order by ie.icustay_id;
+order by ie.patientUnitStayID;
