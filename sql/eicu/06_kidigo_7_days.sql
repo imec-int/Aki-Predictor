@@ -12,10 +12,10 @@ CREATE MATERIALIZED VIEW kdigo_stages_7day AS WITH cr_aki AS (
             ORDER BY k.aki_stage_creat DESC,
                 k.creat DESC
         ) AS rn
-    FROM icustays ie
-        INNER JOIN kdigo_stages k ON ie.icustay_id = k.icustay_id
-    WHERE k.charttime > (ie.intime - interval '6' hour)
-        AND k.charttime <= (ie.intime + interval '7' day)
+    FROM patient ie
+        INNER JOIN kdigo_stages k ON ie.patientUnitStayID = k.icustay_id
+    WHERE k.charttime > -6*60 - ie.hospitalAdmitOffset -- assuming kdigo_stages.charttime is relative to hospital admission and in minutes
+        AND k.charttime <= 7*24*60 - ie.hospitalAdmitOffset
         AND k.aki_stage_creat IS NOT NULL
 ),
 uo_aki AS (
@@ -32,13 +32,13 @@ uo_aki AS (
                 k.uo_rt_12hr DESC,
                 k.uo_rt_6hr DESC
         ) AS rn
-    FROM icustays ie
-        INNER JOIN kdigo_stages k ON ie.icustay_id = k.icustay_id
-    WHERE k.charttime > (ie.intime - interval '6' hour)
-        AND k.charttime <= (ie.intime + interval '7' day)
+    FROM patient ie
+        INNER JOIN kdigo_stages k ON ie.patientUnitStayID = k.icustay_id
+    WHERE k.charttime > -6*60 - ie.hospitalAdmitOffset -- assuming kdigo_stages.charttime is relative to hospital admission and in minutes
+        AND k.charttime <= 7*24*60 - ie.hospitalAdmitOffset
         AND k.aki_stage_uo IS NOT NULL
 )
-select ie.icustay_id,
+select ie.patientUnitStayID AS icustay_id,
     cr.charttime as charttime_creat,
     cr.creat,
     cr.aki_stage_creat,
@@ -52,9 +52,9 @@ select ie.icustay_id,
         WHEN GREATEST(cr.aki_stage_creat, uo.aki_stage_uo) > 0 THEN 1
         ELSE 0
     END AS aki_7day
-FROM icustays ie
-    LEFT JOIN cr_aki cr ON ie.icustay_id = cr.icustay_id
+FROM patient ie
+    LEFT JOIN cr_aki cr ON ie.patientUnitStayID = cr.icustay_id
     AND cr.rn = 1
-    LEFT JOIN uo_aki uo ON ie.icustay_id = uo.icustay_id
+    LEFT JOIN uo_aki uo ON ie.patientUnitStayID = uo.icustay_id
     AND uo.rn = 1
-order by ie.icustay_id;
+order by ie.patientUnitStayID;
