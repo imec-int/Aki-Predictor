@@ -29,7 +29,7 @@ uo_stg as (
         uo.uo_rt_24hr,
         CASE
             WHEN uo.uo_rt_6hr IS NULL THEN NULL
-            WHEN uo.charttime <= ie.intime + interval '6' hour THEN 0
+            WHEN uo.charttime <= 6*60 - ie.hospitalAdmitOffset THEN 0 -- assuming kdigo_uo.charttime is relative to hospital admission and in minutes
             WHEN uo.uo_tm_24hr >= 11
             AND uo.uo_rt_24hr < 0.3 THEN 3
             WHEN uo.uo_tm_12hr >= 5
@@ -41,7 +41,7 @@ uo_stg as (
             ELSE 0
         END AS aki_stage_uo
     from kdigo_uo uo
-        INNER JOIN icustays ie ON uo.icustay_id = ie.icustay_id
+        INNER JOIN patient ie ON uo.icustay_id = ie.patientUnitStayID
 ),
 tm_stg AS (
     SELECT icustay_id,
@@ -52,7 +52,7 @@ tm_stg AS (
         charttime
     FROM uo_stg
 )
-select ie.icustay_id,
+select ie.patientUnitStayID AS icustay_id,
     tm.charttime,
     cr.creat,
     cr.aki_stage_creat,
@@ -61,11 +61,11 @@ select ie.icustay_id,
     uo.uo_rt_24hr,
     uo.aki_stage_uo,
     GREATEST(cr.aki_stage_creat, uo.aki_stage_uo) AS aki_stage
-FROM icustays ie
-    LEFT JOIN tm_stg tm ON ie.icustay_id = tm.icustay_id
-    LEFT JOIN cr_stg cr ON ie.icustay_id = cr.icustay_id
+FROM patient ie
+    LEFT JOIN tm_stg tm ON ie.patientUnitStayID = tm.icustay_id
+    LEFT JOIN cr_stg cr ON ie.patientUnitStayID = cr.icustay_id
     AND tm.charttime = cr.charttime
-    LEFT JOIN uo_stg uo ON ie.icustay_id = uo.icustay_id
+    LEFT JOIN uo_stg uo ON ie.patientUnitStayID = uo.icustay_id
     AND tm.charttime = uo.charttime
-order by ie.icustay_id,
+order by ie.patientUnitStayID,
     tm.charttime;
