@@ -6,6 +6,8 @@ import dotenv
 from sqlalchemy import create_engine
 from pathlib import Path
 import argparse
+import fastparquet
+import snappy
 
 
 def test_postgres(cursor):
