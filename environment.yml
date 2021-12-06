@@ -1,4 +1,6 @@
 name: aki-predictor
+channels:
+- conda-forge
 dependencies:
   - python==3.8
   - python-dotenv==0.19.2
@@ -8,3 +10,7 @@ dependencies:
   - fastparquet
   # - pip:
   - python-snappy
+  - jupyterlab=3.2
+  - nb_conda_kernels
+  - plotly
+  - plotly_express 
