@@ -327,3 +327,29 @@ ORDER BY label
 | 220621 | Glucose (serum)                       | None     | 8 Glucose   |
 | 226537 | Glucose (whole blood)                 | None     | 8 Glucose   |
 | 225664 | Glucose finger stick                  | None     | 8 Glucose   |
+
+# weight_duration Weight codes
+
+```
+SELECT itemid, label, unitname
+FROM mimiciii.d_items
+WHERE itemid IN (
+        3580, 3581, 3582, --wt_°_neonate
+		4183, 3723, --birth_wt
+		762, 226512, 763, 224639, --? (wt_stg)
+		-- weight neonate nodige?
+		-- echo data?
+)
+ORDER BY label
+```
+| itemid | label                   | unitname |
+|--------|-------------------------|----------|
+| 226512 | "Admission Weight (Kg)" | "kg"     |
+| 762    | "Admit Wt"              |          |
+| 3723   | "Birth Weight    (kg)"  |          |
+| 4183   | "Birthweight (kg)"      |          |
+| 224639 | "Daily Weight"          | "kg"     |
+| 763    | "Daily Weight"          |          |
+| 3580   | "Present Weight  (kg)"  |          |
+| 3581   | "Present Weight  (lb)"  |          |
+| 3582   | "Present Weight  (oz)"  |          |
