@@ -3,6 +3,7 @@
 DROP MATERIALIZED VIEW IF EXISTS urineoutput CASCADE;
 
 CREATE MATERIALIZED VIEW urineoutput as
+--todo should this not be "distinct"? see last dot https://eicu-crd.mit.edu/eicutables/intakeoutput/
 with uo as (
     select patientunitstayid,
         intakeoutputoffset,
