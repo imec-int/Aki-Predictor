@@ -10,7 +10,7 @@
 -- this assumption may overestimate UO rate when documentation is done less than hourly  
 -- 6 hours  
 DROP MATERIALIZED VIEW IF EXISTS kdigo_uo CASCADE;
-CREATE MATERIALIZED VIEW kdigo_uo AS with ur_stg as (
+CREATE MATERIALIZED VIEW kdigo_uo  AS with ur_stg as (
     select io.patientunitstayid,
         io.chartoffset,
         sum(
@@ -66,9 +66,10 @@ CREATE MATERIALIZED VIEW kdigo_uo AS with ur_stg as (
                 
             group by io.patientunitstayid,
                 io.chartoffset
+            -- limit 10000
         )
     select ur.patientunitstayid,
-        ur.chartoffset,
+        ur.chartoffset as charttime,
         wd.starttime,
         wd.endtime,
         wd.weight,
@@ -98,5 +99,10 @@ CREATE MATERIALIZED VIEW kdigo_uo AS with ur_stg as (
         inner join weightdurations wd on ur.patientunitstayid = wd.patientunitstayid --TODO used to be left join, yet we have more urineoutput ids than weight ids...
         and ur.chartoffset >= wd.starttime 
         and ur.chartoffset < wd.endtime
+        AND uo_tm_6hr is not NULL
+        and uo_tm_12hr is not NULL
+        and uo_tm_24hr is not NULL
+        and wd.weight is not NULL
+        and wd.weight not in (0)
     order by patientunitstayid,
-        chartoffset;
+        charttime;

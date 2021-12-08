@@ -11,7 +11,7 @@ SELECT pvt.subject_id,
     min(SysBP) as SysBP_Min,
     max(SysBP) as SysBP_Max,
     avg(SysBP) as SysBP_Mean,
-    min(DiasBP) as DiasBP_Min,
+    min(DiasBP) as DiasBP_Min,  
     max(DiasBP) as DiasBP_Max,
     avg(DiasBP) as DiasBP_Mean,
     min(MeanBP) as MeanBP_Min,
@@ -40,10 +40,10 @@ FROM (
             ce.systemicMean AS MeanBP,
             ce.respiration AS RespRate,
             ce.temperature AS TempC,
-            ce.saO2 AS SpO2, -- this is actually not correct, but close enough
+            ce.saO2 AS SpO2 -- this is actually not correct, but close enough
             --TODO glucose from lab?
         FROM patient ie
-            LEFT JOIN vitalsperiodic ce ON ie.patientUnitStayID = ce.patientUnitStayID
+            LEFT JOIN vitalperiodic ce ON ie.patientUnitStayID = ce.patientUnitStayID
                                           --AND ce.hadm_id = ie.hadm_id not needed, patientUnitStayID is enough
                                           --and anyStayOfPat.patientUnitStayID = ce.patientUnitStayID
                                           AND ce.observationOffset between -6*60

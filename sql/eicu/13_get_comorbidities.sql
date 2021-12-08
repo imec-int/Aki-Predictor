@@ -3,7 +3,7 @@ CREATE MATERIALIZED VIEW COMORBIDITIES AS with icd as (
     select ha.patientHealthSystemStayID AS hadm_id,
         -- seq_num, not used
         icd9code AS icd9_code
-    from diagnoses d
+    from diagnosis d
          join patient ha USING (patientUnitStayID)
     where diagnosisPriority != 'Primary'
 ),
@@ -306,7 +306,7 @@ eligrp as (
     from eliflg
     group by hadm_id
 )
-select adm.hadm_id,
+select eli.hadm_id,
     chf as CONGESTIVE_HEART_FAILURE,
     arrhy as CARDIAC_ARRHYTHMIAS,
     valve as VALVULAR_DISEASE,
@@ -330,4 +330,4 @@ select adm.hadm_id,
     drug as DRUG_ABUSE
 from patient adm
     left join eligrp eli on adm.patientHealthSystemStayID = eli.hadm_id
-order by adm.hadm_id;
+order by eli.hadm_id;

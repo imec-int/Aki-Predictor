@@ -1,6 +1,6 @@
 -- weight duration
 DROP MATERIALIZED VIEW IF EXISTS weightdurations CASCADE;
-CREATE MATERIALIZED VIEW weightdurations as WITH htwt as (
+CREATE MATERIALIZED VIEW weightdurations  as WITH htwt as (
     SELECT patientunitstayid,
         hospitaladmitoffset as starttime,
         -- entry in the ICU

@@ -1,5 +1,5 @@
 DROP MATERIALIZED VIEW IF EXISTS kdigo_creat CASCADE;
-CREATE MATERIALIZED VIEW kdigo_creat AS
+CREATE MATERIALIZED VIEW kdigo_creat  AS
 WITH cr as (
     select ie.patientUnitStayID AS icustay_id,
         --ie.intime,  actually not used

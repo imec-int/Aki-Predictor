@@ -21,7 +21,7 @@ CREATE MATERIALIZED VIEW kdigo_stages AS with cr_stg AS (
     FROM kdigo_creat cr
 ),
 uo_stg as (
-    select uo.icustay_id,
+    select uo.patientunitstayid as icustay_id,
         uo.charttime,
         uo.weight,
         uo.uo_rt_6hr,
@@ -41,7 +41,7 @@ uo_stg as (
             ELSE 0
         END AS aki_stage_uo
     from kdigo_uo uo
-        INNER JOIN patient ie ON uo.icustay_id = ie.patientUnitStayID
+        INNER JOIN patient ie ON uo.patientunitstayid = ie.patientUnitStayID
 ),
 tm_stg AS (
     SELECT icustay_id,
