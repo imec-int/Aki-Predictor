@@ -8,9 +8,10 @@ dependencies:
   - SQLAlchemy==1.4.27
   - pandas==1.3.4
   - fastparquet
-  # - pip:
   - python-snappy
   - jupyterlab=3.2
-  - nb_conda_kernels
+  - nb_conda_kernels  
   - plotly
   - plotly_express 
+  - python-kaleido
+

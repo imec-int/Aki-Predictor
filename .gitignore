@@ -131,3 +131,4 @@ dmypy.json
 
 #csv files shouldn't be kept as it's a databreach
 *.csv
+*.parquet

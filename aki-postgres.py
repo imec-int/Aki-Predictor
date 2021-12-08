@@ -54,23 +54,18 @@ AND schemaname != 'information_schema';
         print("Head of extracted pandas DF:")
         print(df.head())
 
-
 def execute_sql(cursor, path):
     for i in sorted(os.listdir(path)):
         print("accessing file: "+i)
         sql_file = open(os.path.join(path, i), 'r')
         cursor.execute(sql_file.read())
-        print("view "+str(i)+" created")
-
 
 def save_sql(conn, sql_path, save_path):
-    # TODO not tested yet
     for i in sorted(os.listdir(sql_path)):
       # we split on the dot, the second part is the name of the file to save, the first part is the order of execution, last is extension
         filename = i.split(".")[1]
         print("accessing save file: "+filename)
         sql_file = open(os.path.join(sql_path, i), 'r')
-        # cursor.execute(sql_file.read())
         df = pd.read_sql_query(sql_file.read(), conn)
         # df.to_csv(os.path.join(save_path, filename+".csv"),
         #           encoding='utf-8', header=True)
@@ -110,15 +105,15 @@ def run(dbname):
         except Exception as error:
             print(error)
 
-    # test_postgres(cursor)
 
+    
     execute_sql(cursor, path=Path.cwd() / 'sql' / dbname)
     save_sql(conn, sql_path=Path.cwd() / 'sql' / 'save',
              save_path=Path.cwd() / 'output' / dbname)
 
 
 if __name__ == '__main__':
-    dbname_constant = 'eicu' # in case of no python arguments
+    dbname_constant = 'eicu'  # in case of no python arguments
 
     load_dotenv()
     parser = argparse.ArgumentParser()

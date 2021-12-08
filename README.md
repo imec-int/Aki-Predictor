@@ -7,13 +7,25 @@ The features includes demographics data, vital signs measured at the bedsidesuch
 as blood urea nitrogen, hemoglobin, white blood count, etc. average of urine output, theminimum  value  of  estimated  glomerular  filtration  rate  (eGFR)  and  creatinine.
 We also included co-morbidities such as congestive heart failure,  hypertension,  diabetes,  etc.
 
+First create a conda environment based on the [environment.yml](environment.yml) file
+
 Execute following script to extract AKI patient data from the MIMIC III tables.
 
 ```
-python aki-postgres.py
+python aki-postgres.py mimiciii
+```
+or for eicu tables
+```
+python aki-postgres.py eicu
 ```
 
-Execute following script to to clean and preprocess the csv files generated from the data extraction step.
+This will generate parquet files of all responses in [output](./output)
+
+In order to explore if this data fetching of eicu data was succesful in comparison with the (proven by ExaScience) mimic-iii fetch, we've added a jupyter notebook to explore the data and create images for all parameters in which mimic data is compared with eicu data:
+
+[jupyter notebook](data_exploration.ipynb)
+
+Execute following script to clean and preprocess the csv files generated from the data extraction step.
 
 ```
 python aki-preprocess.py
