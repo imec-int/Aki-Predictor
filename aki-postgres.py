@@ -2,12 +2,9 @@ import os
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
-import dotenv
 from sqlalchemy import create_engine
 from pathlib import Path
 import argparse
-import fastparquet
-import snappy
 
 
 def test_postgres(cursor):
@@ -105,8 +102,6 @@ def run(dbname):
             cursor = conn.cursor()
         except Exception as error:
             print(error)
-
-
     
     execute_sql(cursor, path=Path.cwd() / 'sql' / dbname)
     save_sql(conn, sql_path=Path.cwd() / 'sql' / 'save',
