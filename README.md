@@ -11,11 +11,13 @@ First create a conda environment based on the [environment.yml](environment.yml)
 
 Execute following script to extract AKI patient data from the MIMIC III tables.
 
-```
+```bash
 python aki-postgres.py mimiciii
 ```
+
 or for eicu tables
-```
+
+```bash
 python aki-postgres.py eicu
 ```
 
@@ -27,14 +29,20 @@ In order to explore if this data fetching of eicu data was succesful in comparis
 
 Execute following script to clean and preprocess the csv files generated from the data extraction step.
 
-```
+```bash
 python aki-preprocess.py
 ```
 
-To run the machine learning model 
+To run the machine learning model on MIMIC-III data, run
 
+```bash
+python aki-ml.py mimiciii
 ```
-python aki-ml.py
+
+or, again, for eicu-tables:
+
+```bash
+python aki-ml.py eicu
 ```
 
 The scripts contains the following functions:
@@ -55,3 +63,19 @@ Included in this repository is a conda environment, listing the needed dependenc
 Create an .env file (based on .env.template) and fill in the variables to update the database credentials and information.
 If the .env file is missing, a database connection to localhost will be used
 
+## AKI-ML output
+
+We'll output some files, depending on the timestamp and the database being accessed. This allows for easier comparison between different runs as well as different datasets.
+
+In [./data/<database_name>/model/weights](./data/mimiciii/model/weights/) you'll find the weights for the model calculated for this database at a certain timestamp.
+
+In [./data/<database_name>/model/metrics](./data/mimiciii/model/metrics/) you'll find the accompanying metrics for this model.
+
+e.g. a confusion matrix:  ![confusion matrix](./example_confusion_matrix.png)
+
+
+When training the model, we can watch and evaluate it's progress by launching a tensorboard pointing at the log directory (e.g. for mimic-III database)
+
+```bash
+tensorboard --logdir ./data/mimic/model/logs/
+```

@@ -16,7 +16,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn import preprocessing
 from sklearn import metrics
 
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix,ConfusionMatrixDisplay
 from sklearn.preprocessing import normalize
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
@@ -32,9 +32,13 @@ from sklearn.model_selection import train_test_split
 from keras.utils.vis_utils import plot_model
 
 from keras.layers import Activation
-from keras.utils import to_categorical
+# from keras.utils import to_categorical #prior version of TF
+from tensorflow.keras.utils import to_categorical #TF2.7 
 
 from pathlib import Path
+import matplotlib.pyplot as plt
+import datetime
+import json
 
 scaler = preprocessing.StandardScaler()
 #scaler = preprocessing.MinMaxScaler()
@@ -190,37 +194,52 @@ def accuracy_confusion(confusion_matrix):
     return diagonal_sum / sum_of_all_elements
 
 
-def compute_metrics(ytest, ypred, multiclass):
-
+def compute_metrics(ytest, ypred, runname, output_path, multiclass):
+    
+    runfile = Path(output_path / 'metrics'/ "{}.json".format(runname))
+    
     if multiclass == True:
         lb = preprocessing.LabelBinarizer()
         lb.fit(ytest)
         ytest = lb.transform(ytest)
         ypred = lb.transform(ypred)
-        print(classification_report(ytest, ypred))  # , labels=[0, 1, 2, 3]))
+        class_rep = classification_report(ytest, ypred, output_dict=True)
+        # save_dict(runfile=runfile, classification_report=class_rep)
+        print(class_rep)  # , labels=[0, 1, 2, 3]))
         C = confusion_matrix(ytest.argmax(axis=1), ypred.argmax(axis=1))
     else:
-        print(classification_report(ytest, ypred))
-
+        class_rep = classification_report(ytest, ypred, output_dict=True)
+        # save_dict(runname=runfile, classification_report=class_rep)
+        print(class_rep)  # , labels=[0, 1, 2, 3]))
         C = confusion_matrix(ytest, ypred)
+    
+    disp = ConfusionMatrixDisplay(confusion_matrix=C)
+    disp.plot() #you need to call this function, otherwise the plot is not being generated and we can't save it
+    plt.savefig(Path(output_path / 'metrics' / "{}.png".format(runname)))
+    
+    # normed_C = normalize(C, axis=1, norm='l1')
 
-    normed_C = normalize(C, axis=1, norm='l1')
+    metrics_dict = dict()
+    metrics_dict["classification_report"]=class_rep
+    metrics_dict["confusion_matrix"]=C.tolist()
+    metrics_dict["accuracy confusion matrix"]=accuracy_confusion(C).tolist()
+    metrics_dict["Area Under ROC"]=metrics.roc_auc_score(ytest, ypred).tolist()
+    metrics_dict["Accuracy score"]=accuracy_score(ytest, ypred).tolist()
+    with open(runfile, 'w') as f:
+        json.dump(metrics_dict, f)
+    return disp
 
-    print("confusion_matrix", C)
-    print("accuracy confusion matrix", accuracy_confusion(C))
-    print("Area Under ROC:", metrics.roc_auc_score(ytest, ypred))
-    print("Accuracy score ", accuracy_score(ytest, ypred))
 
-
-def aki_model(X, Y, X_test, Y_test, filename):
+def aki_model(X, Y, X_test, Y_test, filename, savepath):
     '''
     function to create and train the model
     I've added a Tensorboard as an extra callback (in comparison with ExaScience code)
     '''
+    log_dir = Path( savepath / 'logs' /  filename / 
+        datetime.datetime.now().strftime("%Y%m%d-%H%M%S") )
     callbacks = [
         tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10),
-        tf.keras.callbacks.TensorBoard(
-            log_dir=Path(Path.cwd() /'ML'/'logs'))
+        tf.keras.callbacks.TensorBoard(log_dir=log_dir)
     ]
 
     model = tf.keras.models.Sequential([
@@ -246,53 +265,76 @@ def aki_model(X, Y, X_test, Y_test, filename):
     model.compile(loss='categorical_crossentropy',
                   optimizer='adam', metrics=['accuracy'])
 
-    model.fit(X, Y, epochs=1000, callbacks=callbacks, verbose='auto', use_multiprocessing=True)
+    model.fit(X, Y, epochs=1000, callbacks=callbacks, verbose='auto',use_multiprocessing=True) 
 
-    model.save_weights(filename + ".weights")
+    weights_path = Path(savepath / 'weights' / '{}.weights'.format(filename))
+    model.save_weights(weights_path)
 
-    y_pred_test = np.argmax(model.predict(X_test), axis=-1)#model.predict_classes(X_test) UserWarning: `model.predict_classes()` is deprecated and will be removed after 2021-01-01. Please use instead:* `np.argmax(model.predict(x), axis=-1)`,   if your model does multi-class classification   (e.g. if it uses a `softmax` last-layer activation).* `(model.predict(x) > 0.5).astype("int32")`,   if your model does binary classification   (e.g. if it uses a `sigmoid` last-layer activation).
-    y_pred_train = np.argmax(model.predict(X), axis=-1)#model.predict_classes(X)
+    y_pred_test = np.argmax(model.predict(X_test), axis=-1)
+    y_pred_train = np.argmax(model.predict(X), axis=-1)
 
     return y_pred_train, y_pred_test
 
 
-def make_train_test(df, ntest, seed=None):
+# def make_train_test(df, ntest, seed=None):
 
-    if ntest < 1:
-        ntest = df.shape[0] * ntest
-    if seed is not None:
-        np.random.seed(seed)
+#     if ntest < 1:
+#         ntest = df.shape[0] * ntest
+#     if seed is not None:
+#         np.random.seed(seed)
 
-    ntest = int(round(ntest))
-    rperm = np.random.permutation(df.shape[0])
-    train = rperm[ntest:]
-    test = rperm[0:ntest]
-    dftrain = df.iloc[train]
-    dftest = df.iloc[test]
+#     ntest = int(round(ntest))
+#     rperm = np.random.permutation(df.shape[0])
+#     train = rperm[ntest:]
+#     test = rperm[0:ntest]
+#     dftrain = df.iloc[train]
+#     dftest = df.iloc[test]
 
-    return dftrain, dftest
+#     return dftrain, dftest
 
-
-def run_aki_model(df, filename):
-
+def normalize_df(df):
+    '''
+    the ML model expects its input to be normalized
+    '''
     scaler.fit(df.iloc[:, 2:])
     df.iloc[:, 2:] = scaler.transform(df.iloc[:, 2:])
+    return df
 
-    X = df.drop(['AKI_STAGE_7DAY', 'AKI'], axis=1)
-    Y = df['AKI_STAGE_7DAY']
+def create_datasets(df, split: float):
+    '''
+    a function returning a randomnly splitted dataset, with labels per set
+    parameters:
+    - df: the dataframe to split
+    - split: a floating point value between 0 and 1 to define the ratio of the test set. The training set is the leftover. 
+    '''
+    # drop the AKI column as it's not needed
+    dataframe = df.drop(['AKI'], axis=1)
+    train, test = train_test_split(dataframe, test_size=split, train_size=1-split)
+    # Parameter `AKI_STAGE_7DAY` is the label which we want to predict with our model, so we remove it from the dataset
+    label_train = train.pop('AKI_STAGE_7DAY')
+    label_test = test.pop('AKI_STAGE_7DAY')
+    return train, label_train, test, label_test
 
-    df_train, df_test = make_train_test(df, 0.2, seed=1234)
+def run_aki_model(df, filename, dbname):
+    '''
+    in run aki model, we'll prepare the dataset to feed it to a ML model, after which we fit the model and save all metrics
+    '''
+    # filename is the name of the output file, as we'll link a model to its generated features.
+    # we'll add the time of execution in the filename, as to have an easy identifier
+    filename = '{}_{}'.format(filename, datetime.datetime.now().strftime("%Y%m%d-%H%M%S") )
+    savepath = Path(Path.cwd() / 'data' / dbname / 'model')
+    #first we'll normalize all the data
+    df_norm = normalize_df(df)
+    #Then we'll randomnly split the dataset in training and testing sets, with accompanying labels
+    train, train_label, test, test_label = create_datasets(df=df_norm, split=0.2)
+    print('training examples: {} ,label: {}'.format(train.shape, to_categorical(train_label).shape))
+    print('test examples: {}, label: {}'.format(test.shape,to_categorical(test_label).shape))
 
-    X_train = df_train.drop(['AKI_STAGE_7DAY', 'AKI'], axis=1)
-    Y_train = df_train['AKI_STAGE_7DAY']
-
-    X_test = df_test.drop(['AKI_STAGE_7DAY', 'AKI'], axis=1)
-    Y_test = df_test['AKI_STAGE_7DAY']
-
-    Y_pred_train, Y_pred_test = aki_model(X_train, to_categorical(
-        Y_train), X_test, to_categorical(Y_test), filename)
-
-    compute_metrics(Y_test, Y_pred_test, multiclass=True)
+    # We create and train the model
+    Y_pred_train, Y_pred_test = aki_model(train, to_categorical(
+        train_label), test, to_categorical(test_label), filename=filename, savepath=savepath)
+    # we'll compute the metrics and save them for later comparison
+    compute_metrics(test_label, Y_pred_test, filename, savepath, multiclass=True)
 
 
 def cluster_ethnicity(df):
@@ -332,8 +374,9 @@ def cluster_ethnicity(df):
 
     print("Train on TRAIN caucasian set + test on TEST caucasian set + test on all african set")
 
-    caucasian_train, caucasian_test = make_train_test(
-        caucasian, 0.2, seed=1234)
+    caucasian_train, caucasian_test = create_datasets(caucasian, 0.2)
+    #  make_train_test(
+        # caucasian, 0.2, seed=1234)
 
     X_caucasian_train = caucasian_train.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_caucasian_train = caucasian_train['AKI_STAGE_7DAY']
@@ -341,7 +384,7 @@ def cluster_ethnicity(df):
     X_caucasian_test = caucasian_test.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_caucasian_test = caucasian_test['AKI_STAGE_7DAY']
 
-    african_train, african_test = make_train_test(african, 0.2, seed=1234)
+    african_train, african_test = create_datasets(african, 0.2)#make_train_test(african, 0.2, seed=1234)
 
     X_african_train = african_train.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_african_train = african_train['AKI_STAGE_7DAY']
@@ -349,7 +392,7 @@ def cluster_ethnicity(df):
     X_african_test = african_test.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_african_test = african_test['AKI_STAGE_7DAY']
 
-    hispanic_train, hispanic_test = make_train_test(hispanic, 0.2, seed=1234)
+    hispanic_train, hispanic_test = create_datasets(hispanic, 0.2)#make_train_test(hispanic, 0.2, seed=1234)
 
     X_hispanic_train = hispanic_train.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_hispanic_train = hispanic_train['AKI_STAGE_7DAY']
@@ -357,8 +400,8 @@ def cluster_ethnicity(df):
     X_hispanic_test = hispanic_test.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_hispanic_test = hispanic_test['AKI_STAGE_7DAY']
 
-    others_non_caucasian_train, others_non_caucasian_test = make_train_test(
-        others_non_caucasian, 0.2, seed=1234)
+    others_non_caucasian_train, others_non_caucasian_test = create_datasets(others_non_caucasian, 0.2)#make_train_test(
+        # others_non_caucasian, 0.2, seed=1234)
 
     X_others_non_caucasian_train = others_non_caucasian_train.drop(
         ['AKI', 'AKI_STAGE_7DAY'], axis=1)
@@ -416,7 +459,7 @@ def split_randomly(df, ratio, str):
 
     df.iloc[:, 2:] = scaler.transform(df.iloc[:, 2:])
 
-    df_train, df_test = make_train_test(df, ratio, seed=1234)
+    df_train, df_test = create_datasets(df, ratio)#make_train_test(df, ratio, seed=1234)
 
     X_train = df_train.drop(['AKI_STAGE_7DAY', 'AKI'], axis=1)
     Y_train = df_train['AKI_STAGE_7DAY']
@@ -482,11 +525,11 @@ if __name__ == '__main__':
                'ETHNICITY', 'LACTATE_MIN', 'INR_MAX', 'BANDS_MAX', 'BANDS_MIN', 'HYPERTENSION', 'HYPOTHYROIDISM', 'CONGESTIVE_HEART_FAILURE', 'GENDER', 'CARDIAC_ARRHYTHMIAS', 'SPO2_MAX',
                'ALCOHOL_ABUSE', 'DRUG_ABUSE', 'VALVULAR_DISEASE', 'OBESITY', 'PERIPHERAL_VASCULAR', 'DIABETES_COMPLICATED', 'LIVER_DISEASE', 'DIABETES_UNCOMPLICATED', 'RENAL_FAILURE']]
 
-    run_aki_model(df, "creatinine_model")
-    run_aki_model(df2, "creatinine_urine_model")
+    run_aki_model(df, "creatinine_model", dbname)
+    run_aki_model(df2, "creatinine_urine_model", dbname)
 
-    cluster_ethnicity(df)
-    cluster_ethnicity(df2)
+    # cluster_ethnicity(df)
+    # cluster_ethnicity(df2)
 
-    change_data_size(df)
-    change_data_size(df2)
+    # change_data_size(df)
+    # change_data_size(df2)

@@ -15,5 +15,6 @@ dependencies:
   - plotly_express 
   - python-kaleido
   - keras
-  - tensorflow
   - scikit-learn
+  - pip:
+    - tensorflow
