@@ -1,90 +1,36 @@
 import os
-import sys
 
-import numpy as np
 import pandas as pd
 import argparse
-
-import os
-from chunk import Chunk
-
-import time
-
-from util.reader import Reader
-from util.util import create_folder, create_insights
-
 from pathlib import Path
 
-path_data_preprocessed = './data/eicu/preprocessed'
+from util.util import create_insights
 
-# create_folder(path_preprocess_data) #TODO this is not logical: you're creating an empty folder, yet expect all preprocessed data already there...
 
-path_data_raw = 'data/eicu/raw'
+dbname = 'mimiciii'
 
-def get_info_admissions():
-    """Todo remove here: data should be fetched using SQL, same as other data."""
 
-    reader = Reader(path_dataset=path_data_raw)
+def read_queried(dbname:str, filename:str):
+    df = pd.read_parquet(os.path.join('.', 'data', dbname, 'queried', filename))
+    df.columns = map(str.upper, df.columns)
+    return df
 
-    df = reader.read_admissions_table()
-    # stay time : discharge time - admission time
-    df['STAYTIME'] = df['DISCHTIME'] - df['ADMITTIME']
-    df['STAYTIME'] = df['STAYTIME'] / np.timedelta64(1, 'h')
 
-    # formula to calculate the age of patients in MIMIC3
-
-    patients = reader.read_patients_table()
-    df = pd.merge(df, patients, how='left', on='SUBJECT_ID')
-    df['DOB'] = pd.to_datetime(df['DOB'])
-    df['ADMITTIME'] = pd.to_datetime(df['ADMITTIME'])
-    df['AGE'] = (df['ADMITTIME'].dt.year - df['DOB'].dt.year)
-
-    # Patients who are older than 89 years old at any time in the database
-    # have had their date of birth shifted to obscure their age and comply with HIPAA.
-    # The date of birth was then set to exactly 300 years before their first admission.
-    df.loc[((df.AGE > 89) | (df.AGE < 0)), 'AGE'] = 90
-
-    # select patiens older than 18
-
-    icustays = reader.read_icustay_table()
-
-    # merge on the HADM_ID, unique, represents a single patient's admission to the hospital
-    # while subject_id can be redundant meaning that a patient had many stays at the hospital
-    df = pd.merge(df, icustays, how='right', on='HADM_ID')
-
-    # the elapsed time between the admission in the hospital and the tranfer to the ICU
-    df['Time go ICU'] = (df['INTIME'] - df['ADMITTIME']) / \
-        np.timedelta64(1, 'h')
-
-    # the elapsed time in the ICU
-    df['Time in ICU'] = (df['OUTTIME'] - df['INTIME']) / np.timedelta64(1, 'h')
-
-    # the elapsed time between the admission in the ICU and the final discharge from the hospital
-    df['Time after go ICU'] = (
-        df['DISCHTIME'] - df['INTIME']) / np.timedelta64(1, 'h')
-
-    # how many time the patient has been transferrred to the ICU during one admission
-    df['Count times go ICU'] = df.groupby(
-        'HADM_ID')['ICUSTAY_ID'].transform('count')
-
-    if os.path.exists("demofile.txt"):
-        os.remove("demofile.txt")
-    else:
-        print("The file does not exist")
-
-    with open(os.path.join(path_data_preprocessed, 'ADMISSIONS.csv'), 'w') as f:
-        df.to_csv(f, encoding='utf-8', header=True)
+def open_preprocessed_to_write(dbname:str, filename:str):
+    folderpath = Path.cwd() / 'data' / dbname / 'preprocessed'
+    folderpath.mkdir(parents=True, exist_ok=True)
+    return open(os.path.join(folderpath, filename), 'w')
 
 
 def contains_with_hadm(hadm_id, diagnoses):
     """Returns whether diagnoses contains at least one diagnosis with diagnosis['HADM_ID'] == hadm_id ."""
-    return not diagnoses[diagnoses['HADM_ID']].isin(hadm_id).empty
+    return not diagnoses.loc[diagnoses['HADM_ID'].isin(hadm_id)].empty
 
 
 def caculate_eGFR_MDRD_equation(cr, gender, eth, age):
     # TODO error RuntimeWarning: divide by zero encountered in power
     if(cr == 0 or age == 0):
-        print("skipping sample: ", cr, age)
+        #print("skipping sample: ", cr, age)
         return 0
     temp = 186 * (cr ** (-1.154)) * (age ** (-0.203))
     if (gender == 'F'):
@@ -96,12 +42,12 @@ def caculate_eGFR_MDRD_equation(cr, gender, eth, age):
 
 def get_aki_patients_7days():
 
-    df = pd.read_csv(os.path.join(path_data_preprocessed, 'ADMISSIONS.csv'))
-    df = df.sort_values(by=['SUBJECT_ID_x', 'HADM_ID', 'ICUSTAY_ID'])
+    df = read_queried(dbname, 'ADMISSIONS.parquet')
+    df = df.sort_values(by=['SUBJECT_ID', 'HADM_ID', 'ICUSTAY_ID'])
 
     print("admissions info", df.shape)
     print("number of unique subjects in admission: ",
-          df['SUBJECT_ID_x'].nunique())
+          df['SUBJECT_ID'].nunique())
     print("number of icustays info in admissions: ",
           df['ICUSTAY_ID'].nunique())
 
@@ -110,12 +56,10 @@ def get_aki_patients_7days():
     info_save['EGFR'] = -1
 
     print("the biggest number of ICU stays for a patient: ",
-          info_save['Count times go ICU'].max())
+          info_save['COUNTTIMESGOICU'].max())
 
-    c_aki_7d = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'AKI_KIDIGO_7D_SQL.csv'))
-    c_aki_7d.columns = map(str.upper, c_aki_7d.columns)
-
+    c_aki_7d = read_queried(dbname, 'AKI_KIDIGO_7D_SQL.parquet')
+    
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
     print('NORMAL Patients in 7DAY: {}'.format(
         c_aki_7d.loc[c_aki_7d['AKI_STAGE_7DAY'] == 0]['ICUSTAY_ID'].count()))
@@ -144,15 +88,11 @@ def get_aki_patients_7days():
     count_renalfailure_normal = 0
     count_renalfailure_aki = 0
     print("entering temp")
-    diagnoses = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'comorbidities.csv'))
-    diagnoses.columns = map(str.upper, diagnoses.columns)
+    diagnoses = read_queried(dbname, 'comorbidities.parquet')
     renal_diagnoses = diagnoses.loc[diagnoses['RENAL_FAILURE'] == 1]
 
-    diagnoses_check = pd.read_csv(os.path.join(
-        path_data_raw, 'DIAGNOSES_ICD.csv'))
-    diagnoses_check.columns = map(str.upper, diagnoses_check.columns)
-
+    diagnoses_check = read_queried(dbname, 'DIAGNOSES_ICD.parquet')
+    
     check_aki_before_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
         ['5845', '5846', '5847', '5848'])]
     check_CKD_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
@@ -203,30 +143,17 @@ def get_aki_patients_7days():
             else:
                 count_renalfailure_normal = count_renalfailure_normal + 1
     print("merging with labstay")
-    lab = pd.read_csv(os.path.join(path_data_preprocessed, 'labstay.csv'))
-    lab.columns = map(str.upper, lab.columns)
+    lab = read_queried(dbname, 'labstay.parquet')
     info_save = pd.merge(df_save, lab, how='left', on='ICUSTAY_ID')
-    info_save = info_save.drop(columns=['UNNAMED: 0_x', 'UNNAMED: 0_y'])
-    info_save = info_save.rename(
-        columns={'SUBJECT_ID_X': 'SUBJECT_ID', 'HADM_ID_x': 'HADM_ID'})
-
     print("merging with vitalstay")
-    chart = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'chart_vitals_stay.csv'))
-    chart.columns = map(str.upper, chart.columns)
+    chart = read_queried(dbname, 'chart_vitals_stay.parquet')
     df_save = pd.merge(info_save, chart, how='left', on='ICUSTAY_ID')
-    df_save = df_save.drop(
-        columns=['UNNAMED: 0', 'HADM_ID_y', 'HADM_ID_y', 'SUBJECT_ID_Y', 'SUBJECT_ID_y'])
-    df_save = df_save.rename(
-        columns={'SUBJECT_ID_X': 'SUBJECT_ID', 'HADM_ID_x': 'HADM_ID'})
 
     print("merging with comorbidities")
-    comorbidities = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'comorbidities.csv'))
-    comorbidities.columns = map(str.upper, comorbidities.columns)
-
+    comorbidities = read_queried(dbname, 'comorbidities.parquet')
+    
     info_save = pd.merge(df_save, comorbidities, how='left', on='HADM_ID')
-    info_save = info_save.drop(columns=['UNNAMED: 0'])
+    #info_save = info_save.drop(columns=['UNNAMED: 0'])
 
     print('NORMAL Patients in 7DAY: {}'.format(
         c_aki_7d.loc[c_aki_7d['AKI_STAGE_7DAY'] == 0]['ICUSTAY_ID'].count()))
@@ -241,18 +168,18 @@ def get_aki_patients_7days():
     print('normal: {}'.format(count_normal))
     print('aki: {}'.format(count_aki))
 
-    with open(os.path.join(path_data_preprocessed, 'INFO_DATASET_7days_creatinine+urine2.csv'), 'w') as f:
+    with open_preprocessed_to_write(dbname, 'INFO_DATASET_7days_creatinine+urine2.csv') as f:
         info_save.to_csv(f, encoding='utf-8', header=True)
 
 
 def get_aki_patients_7days_creatinine():
 
-    df = pd.read_csv(os.path.join(path_data_preprocessed, 'ADMISSIONS.csv'))
-    df = df.sort_values(by=['SUBJECT_ID_x', 'HADM_ID', 'ICUSTAY_ID'])
+    df = read_queried(dbname, 'ADMISSIONS.parquet')
+    df = df.sort_values(by=['SUBJECT_ID', 'HADM_ID', 'ICUSTAY_ID'])
 
     print("admissions info", df.shape)
     print("number of unique subjects in admission: ",
-          df['SUBJECT_ID_x'].nunique())
+          df['SUBJECT_ID'].nunique())
     print("number of icustays info in admissions: ",
           df['ICUSTAY_ID'].nunique())
 
@@ -261,11 +188,9 @@ def get_aki_patients_7days_creatinine():
     info_save['EGFR'] = -1
 
     print("the biggest number of ICU stays for a patient: ",
-          info_save['Count times go ICU'].max())
+          info_save['COUNTTIMESGOICU'].max())
 
-    c_aki_7d = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'AKI_KIDIGO_7D_SQL_CREATININE.csv'))
-    c_aki_7d.columns = map(str.upper, c_aki_7d.columns)
+    c_aki_7d = read_queried(dbname, 'AKI_KIDIGO_7D_SQL_CREATININE.parquet')
     print("c_aki_7d infos")
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
     print('NORMAL Patients in 7DAY: {}'.format(
@@ -296,16 +221,11 @@ def get_aki_patients_7days_creatinine():
     count_renalfailure_normal = 0
     count_renalfailure_aki = 0
 
-
-    diagnoses = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'comorbidities.csv'))
-    diagnoses.columns = map(str.upper, diagnoses.columns)
+    diagnoses = read_queried(dbname, 'comorbidities.parquet')
     renal_diagnoses = diagnoses.loc[diagnoses['RENAL_FAILURE'] == 1]
 
-    diagnoses_check = pd.read_csv(os.path.join(
-        path_data_raw, 'DIAGNOSES_ICD.csv'))
-    diagnoses_check.columns = map(str.upper, diagnoses_check.columns)
-
+    diagnoses_check = read_queried(dbname, 'DIAGNOSES_ICD.parquet')
+    
     check_aki_before_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
         ['5845', '5846', '5847', '5848'])]
     check_CKD_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
@@ -356,27 +276,15 @@ def get_aki_patients_7days_creatinine():
             else:
                 count_renalfailure_normal = count_renalfailure_normal + 1
 
-    lab = pd.read_csv(os.path.join(path_data_preprocessed, 'labstay.csv'))
-    lab.columns = map(str.upper, lab.columns)
+    lab = read_queried(dbname, 'labstay.parquet')
     info_save = pd.merge(df_save, lab, how='left', on='ICUSTAY_ID')
-    info_save = info_save.drop(columns=['UNNAMED: 0_x', 'UNNAMED: 0_y'])
-    info_save = info_save.rename(
-        columns={'SUBJECT_ID_X': 'SUBJECT_ID', 'HADM_ID_x': 'HADM_ID'})
 
-    chart = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'chart_vitals_stay.csv'))
-    chart.columns = map(str.upper, chart.columns)
+    chart = read_queried(dbname, 'chart_vitals_stay.parquet')
     df_save = pd.merge(info_save, chart, how='left', on='ICUSTAY_ID')
-    df_save = df_save.drop(
-        columns=['UNNAMED: 0', 'HADM_ID_y', 'HADM_ID_y', 'SUBJECT_ID_Y', 'SUBJECT_ID_y'])
-    df_save = df_save.rename(
-        columns={'SUBJECT_ID_X': 'SUBJECT_ID', 'HADM_ID_x': 'HADM_ID'})
 
-    comorbidities = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'comorbidities.csv'))
-    comorbidities.columns = map(str.upper, comorbidities.columns)
+    comorbidities = read_queried(dbname, 'comorbidities.parquet')
     info_save = pd.merge(df_save, comorbidities, how='left', on='HADM_ID')
-    info_save = info_save.drop(columns=['UNNAMED: 0'])
+    #info_save = info_save.drop(columns=['UNNAMED: 0'])
 
     print('NORMAL Patients in 7DAY: {}'.format(
         c_aki_7d.loc[c_aki_7d['AKI_STAGE_7DAY'] == 0]['ICUSTAY_ID'].count()))
@@ -391,8 +299,9 @@ def get_aki_patients_7days_creatinine():
     print('normal: {}'.format(count_normal))
     print('aki: {}'.format(count_aki))
 
-    with open(os.path.join(path_data_preprocessed, 'INFO_DATASET_7days_creatinine2.csv'), 'w') as f:
+    with open_preprocessed_to_write(dbname, 'INFO_DATASET_7days_creatinine2.csv') as f:
         info_save.to_csv(f, encoding='utf-8', header=True)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -402,41 +311,32 @@ if __name__ == '__main__':
     dbname = 'eicu' # default
     if args.dbname:
         dbname = args.dbname
-    
-    path_data_preprocessed = Path.cwd() / 'data' / dbname / 'preprocessed'
-    path_data_raw = Path.cwd() / 'data' / dbname / 'raw'
 
     cols_insights = ["total ICUstays", "No AKI Observations", "AKI STAGE 1 observations",
                      "AKI STAGE 2 observations", "AKI STAGE 3 observations", "NaN AKI observations"]
     insights_df = pd.DataFrame(index=cols_insights)
 
-    c_aki = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'AKI_KIDIGO_STAGES_SQL.csv'))
+    c_aki = read_queried(dbname, 'AKI_KIDIGO_STAGES_SQL.parquet')
     c_aki, insights_df = create_insights(
         c_aki, "c_aki_full", insights_df, 'AKI_STAGE')
 
-    c_aki_7d = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'AKI_KIDIGO_7D_SQL.csv'))
+    c_aki_7d = read_queried(dbname, 'AKI_KIDIGO_7D_SQL.parquet')
     c_aki_7d, insights_df = create_insights(
         c_aki_7d, "c_aki_7d_full", insights_df, 'AKI_STAGE_7DAY')
     c_aki_7d = c_aki_7d.dropna(subset=['AKI_STAGE_7DAY'])
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
 
     print("USING ONLY CREATININE")
-    c_aki_7d = pd.read_csv(os.path.join(
-        path_data_preprocessed, 'AKI_KIDIGO_7D_SQL_CREATININE.csv'))
+    c_aki_7d = read_queried(dbname, 'AKI_KIDIGO_7D_SQL_CREATININE.parquet')
     c_aki_7d, insights_df = create_insights(
         c_aki_7d, "c_aki_7d creat_only", insights_df, 'AKI_STAGE_7DAY')
 
     #c_aki_7d = c_aki_7d.loc[c_aki_7d['AKI_STAGE_7DAY'].isin(['0', '1'])]
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
 
-    c_aki = pd.read_csv(os.path.join(path_data_preprocessed,
-                        'AKI_KIDIGO_STAGES_SQL_CREATININE.csv'))
+    c_aki = read_queried(dbname, 'AKI_KIDIGO_STAGES_SQL_CREATININE.parquet')
     c_aki, insights_df = create_insights(
         c_aki, "c_aki_full creatinine infos", insights_df, 'AKI_STAGE')
-
-    get_info_admissions()
 
     get_aki_patients_7days()
 

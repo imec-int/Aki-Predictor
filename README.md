@@ -7,51 +7,34 @@ The features includes demographics data, vital signs measured at the bedsidesuch
 as blood urea nitrogen, hemoglobin, white blood count, etc. average of urine output, theminimum  value  of  estimated  glomerular  filtration  rate  (eGFR)  and  creatinine.
 We also included co-morbidities such as congestive heart failure,  hypertension,  diabetes,  etc.
 
-First create a conda environment based on the [environment.yml](environment.yml) file
+## How to run
 
-Execute following script to extract AKI patient data from the MIMIC III tables.
+1. First create a conda environment based on the [environment.yml](environment.yml) file:
+   ```
+   conda env create -f environment.yml
+   conda activate aki-predictor 
+   ```
+2. Make a copy of .env.template named .env: `cp .env.template .env`
+   
+   (If the .env file is missing, a database connection to localhost will be used)
+3. Fill in the values.
+4. Set the environment variables using: `. .env`
+5. Execute one of the following commands to extract AKI patient data from the MIMIC III or eICU databases:
+   - `python aki-postgres.py --dbname mimiciii`
+   - `python aki-postgres.py --dbname eicu`
+   
+   This will generate parquet files of all responses in [data/queried](./data/queried)
 
-```
-python aki-postgres.py mimiciii
-```
-or for eicu tables
-```
-python aki-postgres.py eicu
-```
+(In order to explore if this data fetching of eicu data was succesful in comparison with the (proven by ExaScience) mimic-iii fetch, we've added a jupyter notebook to explore the data and create images for all parameters in which mimic data is compared with eicu data:
+[jupyter notebook](data_exploration.ipynb).)
 
-This will generate parquet files of all responses in [output](./output)
-
-In order to explore if this data fetching of eicu data was succesful in comparison with the (proven by ExaScience) mimic-iii fetch, we've added a jupyter notebook to explore the data and create images for all parameters in which mimic data is compared with eicu data:
-
-[jupyter notebook](data_exploration.ipynb)
-
-Execute following script to clean and preprocess the csv files generated from the data extraction step.
-
-```
-python aki-preprocess.py
-```
-
-To run the machine learning model 
-
-```
-python aki-ml.py
-```
+6. Execute one of the following commands to clean and preprocess the csv files generated from the data extraction step:
+   - `python aki-preprocess.py --dbname mimiciii`
+   - `python aki-preprocess.py --dbname eicu`
+7. To run the machine learning model run: `python aki-ml.py`
 
 The scripts contains the following functions:
 
 * run_aki_model: predicts wether a patient will develop AKI withnin the first 7 days of its stay and which stage of AKI it is according to the KIDIGO guidelines.
 * cluster_ethnicity: subsets the data  by  ethnicity:  train  on  ”Caucasian”  (all variants),  predict  for  all  other  ethnicities.   
 * change_data_size: does random subsampling of available training data
-
-## Conda environment
-
-Included in this repository is a conda environment, listing the needed dependencies
-
-    conda env create -f environment.yml
-    conda activate aki-predictor 
-
-## Environment variable
-
-Create an .env file (based on .env.template) and fill in the variables to update the database credentials and information.
-If the .env file is missing, a database connection to localhost will be used
-
