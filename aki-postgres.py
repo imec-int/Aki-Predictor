@@ -61,6 +61,7 @@ def execute_sql(cursor, path):
         cursor.execute(sql_file.read())
 
 def save_sql(conn, sql_path, save_path):
+    save_path.mkdir(parents=True, exist_ok=True)
     for i in sorted(os.listdir(sql_path)):
       # we split on the dot, the second part is the name of the file to save, the first part is the order of execution, last is extension
         filename = i.split(".")[1]
@@ -109,7 +110,7 @@ def run(dbname):
     
     execute_sql(cursor, path=Path.cwd() / 'sql' / dbname)
     save_sql(conn, sql_path=Path.cwd() / 'sql' / 'save',
-             save_path=Path.cwd() / 'output' / dbname)
+             save_path=Path.cwd() / 'data' / dbname / 'queried')
 
 
 if __name__ == '__main__':

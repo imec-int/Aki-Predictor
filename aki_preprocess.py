@@ -3,6 +3,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+import argparse
 
 import os
 from chunk import Chunk
@@ -12,16 +13,18 @@ import time
 from util.reader import Reader
 from util.util import create_folder, create_insights
 
-path_preprocess_data = './preprocessing'
+from pathlib import Path
+
+path_data_preprocessed = './data/eicu/preprocessed'
 
 # create_folder(path_preprocess_data) #TODO this is not logical: you're creating an empty folder, yet expect all preprocessed data already there...
 
-path_dataset = 'mimic-iii-clinical-database-1.4'  # Path to your mimic database
-
-reader = Reader(path_dataset=path_dataset)
-
+path_data_raw = 'data/eicu/raw'
 
 def get_info_admissions():
+    """Todo remove here: data should be fetched using SQL, same as other data."""
+
+    reader = Reader(path_dataset=path_data_raw)
 
     df = reader.read_admissions_table()
     # stay time : discharge time - admission time
@@ -69,31 +72,13 @@ def get_info_admissions():
     else:
         print("The file does not exist")
 
-    with open(os.path.join(path_preprocess_data, 'ADMISSIONS.csv'), 'w') as f:
+    with open(os.path.join(path_data_preprocessed, 'ADMISSIONS.csv'), 'w') as f:
         df.to_csv(f, encoding='utf-8', header=True)
 
 
-def check_AKI_before(hadm_id, diagnoses):
-    if not diagnoses[diagnoses['HADM_ID'].isin(hadm_id)].empty:
-        return True
-
-    return False
-
-
-def check_CKD(hadm_id, diagnoses):
-   # print(diagnoses['HADM_ID'] , diagnoses[diagnoses['HADM_ID'].isin(hadm_id)])
-    if not diagnoses[diagnoses['HADM_ID'].isin(hadm_id)].empty:
-        return True
-
-    return False
-
-
-def check_renal_failure(hadm_id, diagnoses):
-   # print(diagnoses['HADM_ID'] , diagnoses[diagnoses['HADM_ID'].isin(hadm_id)])
-    if not diagnoses[diagnoses['HADM_ID'].isin(hadm_id)].empty:
-        return True
-
-    return False
+def contains_with_hadm(hadm_id, diagnoses):
+    """Returns whether diagnoses contains at least one diagnosis with diagnosis['HADM_ID'] == hadm_id ."""
+    return not diagnoses[diagnoses['HADM_ID']].isin(hadm_id).empty
 
 
 def caculate_eGFR_MDRD_equation(cr, gender, eth, age):
@@ -111,7 +96,7 @@ def caculate_eGFR_MDRD_equation(cr, gender, eth, age):
 
 def get_aki_patients_7days():
 
-    df = pd.read_csv(os.path.join(path_preprocess_data, 'ADMISSIONS.csv'))
+    df = pd.read_csv(os.path.join(path_data_preprocessed, 'ADMISSIONS.csv'))
     df = df.sort_values(by=['SUBJECT_ID_x', 'HADM_ID', 'ICUSTAY_ID'])
 
     print("admissions info", df.shape)
@@ -128,7 +113,7 @@ def get_aki_patients_7days():
           info_save['Count times go ICU'].max())
 
     c_aki_7d = pd.read_csv(os.path.join(
-        path_preprocess_data, 'AKI_KIDIGO_7D_SQL.csv'))
+        path_data_preprocessed, 'AKI_KIDIGO_7D_SQL.csv'))
     c_aki_7d.columns = map(str.upper, c_aki_7d.columns)
 
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
@@ -160,12 +145,12 @@ def get_aki_patients_7days():
     count_renalfailure_aki = 0
     print("entering temp")
     diagnoses = pd.read_csv(os.path.join(
-        path_preprocess_data, 'comorbidities.csv'))
+        path_data_preprocessed, 'comorbidities.csv'))
     diagnoses.columns = map(str.upper, diagnoses.columns)
     renal_diagnoses = diagnoses.loc[diagnoses['RENAL_FAILURE'] == 1]
 
     diagnoses_check = pd.read_csv(os.path.join(
-        path_dataset, 'DIAGNOSES_ICD.csv'))
+        path_data_raw, 'DIAGNOSES_ICD.csv'))
     diagnoses_check.columns = map(str.upper, diagnoses_check.columns)
 
     check_aki_before_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
@@ -194,7 +179,7 @@ def get_aki_patients_7days():
         else:
             count_normal = count_normal + 1
 
-        if (check_CKD(temp['HADM_ID'], check_CKD_diagnoses) == True):
+        if (contains_with_hadm(temp['HADM_ID'], check_CKD_diagnoses) == True):
             df_save.loc[df_save['ICUSTAY_ID'] == int(
                 temp['ICUSTAY_ID'].values[0]), 'AKI'] = 2
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
@@ -202,7 +187,7 @@ def get_aki_patients_7days():
             else:
                 count_ckd_normal = count_ckd_normal + 1
 
-        if (check_AKI_before(temp['HADM_ID'], check_aki_before_diagnoses) == True):
+        if (contains_with_hadm(temp['HADM_ID'], check_aki_before_diagnoses) == True):
             df_save.loc[df_save['ICUSTAY_ID'] == int(
                 temp['ICUSTAY_ID'].values[0]), 'AKI'] = 3
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
@@ -210,7 +195,7 @@ def get_aki_patients_7days():
             else:
                 count_akibefore_normal = count_akibefore_normal + 1
 
-        if (check_renal_failure(temp['HADM_ID'], renal_diagnoses) == True):
+        if (contains_with_hadm(temp['HADM_ID'], renal_diagnoses) == True):
             df_save.loc[df_save['ICUSTAY_ID'] == int(
                 temp['ICUSTAY_ID'].values[0]), 'AKI'] = 4
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
@@ -218,7 +203,7 @@ def get_aki_patients_7days():
             else:
                 count_renalfailure_normal = count_renalfailure_normal + 1
     print("merging with labstay")
-    lab = pd.read_csv(os.path.join(path_preprocess_data, 'labstay.csv'))
+    lab = pd.read_csv(os.path.join(path_data_preprocessed, 'labstay.csv'))
     lab.columns = map(str.upper, lab.columns)
     info_save = pd.merge(df_save, lab, how='left', on='ICUSTAY_ID')
     info_save = info_save.drop(columns=['UNNAMED: 0_x', 'UNNAMED: 0_y'])
@@ -227,7 +212,7 @@ def get_aki_patients_7days():
 
     print("merging with vitalstay")
     chart = pd.read_csv(os.path.join(
-        path_preprocess_data, 'chart_vitals_stay.csv'))
+        path_data_preprocessed, 'chart_vitals_stay.csv'))
     chart.columns = map(str.upper, chart.columns)
     df_save = pd.merge(info_save, chart, how='left', on='ICUSTAY_ID')
     df_save = df_save.drop(
@@ -237,7 +222,7 @@ def get_aki_patients_7days():
 
     print("merging with comorbidities")
     comorbidities = pd.read_csv(os.path.join(
-        path_preprocess_data, 'comorbidities.csv'))
+        path_data_preprocessed, 'comorbidities.csv'))
     comorbidities.columns = map(str.upper, comorbidities.columns)
 
     info_save = pd.merge(df_save, comorbidities, how='left', on='HADM_ID')
@@ -256,13 +241,13 @@ def get_aki_patients_7days():
     print('normal: {}'.format(count_normal))
     print('aki: {}'.format(count_aki))
 
-    with open(os.path.join(path_preprocess_data, 'INFO_DATASET_7days_creatinine+urine2.csv'), 'w') as f:
+    with open(os.path.join(path_data_preprocessed, 'INFO_DATASET_7days_creatinine+urine2.csv'), 'w') as f:
         info_save.to_csv(f, encoding='utf-8', header=True)
 
 
 def get_aki_patients_7days_creatinine():
 
-    df = pd.read_csv(os.path.join(path_preprocess_data, 'ADMISSIONS.csv'))
+    df = pd.read_csv(os.path.join(path_data_preprocessed, 'ADMISSIONS.csv'))
     df = df.sort_values(by=['SUBJECT_ID_x', 'HADM_ID', 'ICUSTAY_ID'])
 
     print("admissions info", df.shape)
@@ -279,7 +264,7 @@ def get_aki_patients_7days_creatinine():
           info_save['Count times go ICU'].max())
 
     c_aki_7d = pd.read_csv(os.path.join(
-        path_preprocess_data, 'AKI_KIDIGO_7D_SQL_CREATININE.csv'))
+        path_data_preprocessed, 'AKI_KIDIGO_7D_SQL_CREATININE.csv'))
     c_aki_7d.columns = map(str.upper, c_aki_7d.columns)
     print("c_aki_7d infos")
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
@@ -313,12 +298,12 @@ def get_aki_patients_7days_creatinine():
 
 
     diagnoses = pd.read_csv(os.path.join(
-        path_preprocess_data, 'comorbidities.csv'))
+        path_data_preprocessed, 'comorbidities.csv'))
     diagnoses.columns = map(str.upper, diagnoses.columns)
     renal_diagnoses = diagnoses.loc[diagnoses['RENAL_FAILURE'] == 1]
 
     diagnoses_check = pd.read_csv(os.path.join(
-        path_dataset, 'DIAGNOSES_ICD.csv'))
+        path_data_raw, 'DIAGNOSES_ICD.csv'))
     diagnoses_check.columns = map(str.upper, diagnoses_check.columns)
 
     check_aki_before_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
@@ -347,7 +332,7 @@ def get_aki_patients_7days_creatinine():
         else:
             count_normal = count_normal + 1
 
-        if (check_CKD(temp['HADM_ID'],check_CKD_diagnoses) == True):
+        if (contains_with_hadm(temp['HADM_ID'],check_CKD_diagnoses) == True):
             df_save.loc[df_save['ICUSTAY_ID'] == int(
                 temp['ICUSTAY_ID'].values[0]), 'AKI'] = 2
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
@@ -355,7 +340,7 @@ def get_aki_patients_7days_creatinine():
             else:
                 count_ckd_normal = count_ckd_normal + 1
 
-        if (check_AKI_before(temp['HADM_ID'],check_aki_before_diagnoses) == True):
+        if (contains_with_hadm(temp['HADM_ID'],check_aki_before_diagnoses) == True):
             df_save.loc[df_save['ICUSTAY_ID'] == int(
                 temp['ICUSTAY_ID'].values[0]), 'AKI'] = 3
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
@@ -363,7 +348,7 @@ def get_aki_patients_7days_creatinine():
             else:
                 count_akibefore_normal = count_akibefore_normal + 1
 
-        if (check_renal_failure(temp['HADM_ID'],renal_diagnoses) == True):
+        if (contains_with_hadm(temp['HADM_ID'],renal_diagnoses) == True):
             df_save.loc[df_save['ICUSTAY_ID'] == int(
                 temp['ICUSTAY_ID'].values[0]), 'AKI'] = 4
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
@@ -371,7 +356,7 @@ def get_aki_patients_7days_creatinine():
             else:
                 count_renalfailure_normal = count_renalfailure_normal + 1
 
-    lab = pd.read_csv(os.path.join(path_preprocess_data, 'labstay.csv'))
+    lab = pd.read_csv(os.path.join(path_data_preprocessed, 'labstay.csv'))
     lab.columns = map(str.upper, lab.columns)
     info_save = pd.merge(df_save, lab, how='left', on='ICUSTAY_ID')
     info_save = info_save.drop(columns=['UNNAMED: 0_x', 'UNNAMED: 0_y'])
@@ -379,7 +364,7 @@ def get_aki_patients_7days_creatinine():
         columns={'SUBJECT_ID_X': 'SUBJECT_ID', 'HADM_ID_x': 'HADM_ID'})
 
     chart = pd.read_csv(os.path.join(
-        path_preprocess_data, 'chart_vitals_stay.csv'))
+        path_data_preprocessed, 'chart_vitals_stay.csv'))
     chart.columns = map(str.upper, chart.columns)
     df_save = pd.merge(info_save, chart, how='left', on='ICUSTAY_ID')
     df_save = df_save.drop(
@@ -388,7 +373,7 @@ def get_aki_patients_7days_creatinine():
         columns={'SUBJECT_ID_X': 'SUBJECT_ID', 'HADM_ID_x': 'HADM_ID'})
 
     comorbidities = pd.read_csv(os.path.join(
-        path_preprocess_data, 'comorbidities.csv'))
+        path_data_preprocessed, 'comorbidities.csv'))
     comorbidities.columns = map(str.upper, comorbidities.columns)
     info_save = pd.merge(df_save, comorbidities, how='left', on='HADM_ID')
     info_save = info_save.drop(columns=['UNNAMED: 0'])
@@ -406,23 +391,32 @@ def get_aki_patients_7days_creatinine():
     print('normal: {}'.format(count_normal))
     print('aki: {}'.format(count_aki))
 
-    with open(os.path.join(path_preprocess_data, 'INFO_DATASET_7days_creatinine2.csv'), 'w') as f:
+    with open(os.path.join(path_data_preprocessed, 'INFO_DATASET_7days_creatinine2.csv'), 'w') as f:
         info_save.to_csv(f, encoding='utf-8', header=True)
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dbname", type=str, help="choose database name: eicu or mimiciii", choices=[
+                        'eicu', 'mimiciii'])
+    args = parser.parse_args()
+    dbname = 'eicu' # default
+    if args.dbname:
+        dbname = args.dbname
+    
+    path_data_preprocessed = Path.cwd() / 'data' / dbname / 'preprocessed'
+    path_data_raw = Path.cwd() / 'data' / dbname / 'raw'
 
-def run():
-    print('start')
     cols_insights = ["total ICUstays", "No AKI Observations", "AKI STAGE 1 observations",
                      "AKI STAGE 2 observations", "AKI STAGE 3 observations", "NaN AKI observations"]
     insights_df = pd.DataFrame(index=cols_insights)
 
     c_aki = pd.read_csv(os.path.join(
-        path_preprocess_data, 'AKI_KIDIGO_STAGES_SQL.csv'))
+        path_data_preprocessed, 'AKI_KIDIGO_STAGES_SQL.csv'))
     c_aki, insights_df = create_insights(
         c_aki, "c_aki_full", insights_df, 'AKI_STAGE')
 
     c_aki_7d = pd.read_csv(os.path.join(
-        path_preprocess_data, 'AKI_KIDIGO_7D_SQL.csv'))
+        path_data_preprocessed, 'AKI_KIDIGO_7D_SQL.csv'))
     c_aki_7d, insights_df = create_insights(
         c_aki_7d, "c_aki_7d_full", insights_df, 'AKI_STAGE_7DAY')
     c_aki_7d = c_aki_7d.dropna(subset=['AKI_STAGE_7DAY'])
@@ -430,14 +424,14 @@ def run():
 
     print("USING ONLY CREATININE")
     c_aki_7d = pd.read_csv(os.path.join(
-        path_preprocess_data, 'AKI_KIDIGO_7D_SQL_CREATININE.csv'))
+        path_data_preprocessed, 'AKI_KIDIGO_7D_SQL_CREATININE.csv'))
     c_aki_7d, insights_df = create_insights(
         c_aki_7d, "c_aki_7d creat_only", insights_df, 'AKI_STAGE_7DAY')
 
     #c_aki_7d = c_aki_7d.loc[c_aki_7d['AKI_STAGE_7DAY'].isin(['0', '1'])]
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
 
-    c_aki = pd.read_csv(os.path.join(path_preprocess_data,
+    c_aki = pd.read_csv(os.path.join(path_data_preprocessed,
                         'AKI_KIDIGO_STAGES_SQL_CREATININE.csv'))
     c_aki, insights_df = create_insights(
         c_aki, "c_aki_full creatinine infos", insights_df, 'AKI_STAGE')
@@ -449,7 +443,3 @@ def run():
     get_aki_patients_7days_creatinine()
 
     # statistical_itemid_missing()
-
-
-if __name__ == '__main__':
-    run()

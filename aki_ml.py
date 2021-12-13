@@ -134,14 +134,11 @@ def code_gender(gender):
         return 1
 
 
-outdir = "/AKI_predictor/output/"
-
-
-def cleanup_data(filename, outdir):
+def cleanup_data(dbname, filename):
 
     # read the data from the CSV
     df = pd.read_csv(
-        open(Path(Path.cwd() / 'preprocessing' / filename), "r"), delimiter=",")
+        open(Path(Path.cwd() / 'data' / dbname / 'preprocessed' / filename), "r"), delimiter=",")
 
     df.columns = map(str.upper, df.columns)
     print(df.shape)
@@ -450,8 +447,16 @@ def change_data_size(df):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dbname", type=str, help="choose database name: eicu or mimiciii", choices=[
+                        'eicu', 'mimiciii'])
+    args = parser.parse_args()
+    dbname = 'eicu' # default
+    if args.dbname:
+        dbname = args.dbname
+
     # "INFO_DATASET_7days_creatinine_withcomorbidities.csv"
-    df = cleanup_data("INFO_DATASET_7days_creatinine2.csv", outdir)
+    df = cleanup_data(dbname, "INFO_DATASET_7days_creatinine2.csv")
 
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
@@ -465,7 +470,7 @@ if __name__ == '__main__':
              'CONGESTIVE_HEART_FAILURE', 'SPO2_MAX', 'ALCOHOL_ABUSE', 'GENDER', 'CARDIAC_ARRHYTHMIAS', 'PERIPHERAL_VASCULAR', 'OBESITY', 'HYPOTHYROIDISM', 'DIABETES_COMPLICATED',
              'LIVER_DISEASE', 'DRUG_ABUSE', 'RENAL_FAILURE']]
     # INFO_DATASET_7days_creatinine+urine_withcomorbidities.csv
-    df2 = cleanup_data("INFO_DATASET_7days_creatinine+urine2.csv", outdir)
+    df2 = cleanup_data(dbname, "INFO_DATASET_7days_creatinine+urine2.csv")
     df2 = df2.replace([np.inf, -np.inf], np.nan).dropna()
 
     df2 = df2[['AKI', 'AKI_STAGE_7DAY', 'UO_RT_24HR', 'UO_RT_12HR', 'UO_RT_6HR', 'CREATININE_MAX', 'CREATININE_MIN', 'CREAT', 'EGFR', 'PLATELET_MAX', 'WBC_MAX', 'BUN_MAX',
