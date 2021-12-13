@@ -1,0 +1,1 @@
+select * from kdigo_7_days_creatinine
