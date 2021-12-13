@@ -16,5 +16,7 @@ dependencies:
   - python-kaleido
   - keras
   - scikit-learn
+  - matplotlib
+  - pip
   - pip:
-    - tensorflow
+    - tensorflow==2.7

@@ -46,7 +46,7 @@ The scripts contains the following functions:
 
 Included in this repository is a conda environment, listing the needed dependencies
 
-    conda env create -f environment.yml
+    conda env create --name aki-predictor -f environment.yml
     conda activate aki-predictor 
 
 ## Environment variable
@@ -70,3 +70,5 @@ When training the model, we can watch and evaluate it's progress by launching a 
 ```bash
 tensorboard --logdir ./data/mimic/model/logs/
 ```
+
+if this succefully launches in terminal, open your browser and go to the page displayed in the terminal text.
