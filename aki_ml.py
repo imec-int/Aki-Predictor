@@ -179,10 +179,10 @@ def cleanup_data(dbname, filename):
     if 'AKI_7DAY' in df.columns:
         # ,  'SUBJECT_ID_x','GLUCOSE_MIN_y', 'GLUCOSE_MAX_y'
         df = df.drop(['ADMITTIME', 'DISCHTIME', 'OUTTIME', 'INTIME', 'DOB', 'CHARTTIME_CREAT',
-                     'UNNAMED: 0', 'AKI_STAGE_CREAT', 'AKI_7DAY', 'GLUCOSE_MAX_Y', 'GLUCOSE_MIN_Y'], axis=1)
+                     'UNNAMED: 0', 'AKI_STAGE_CREAT', 'AKI_7DAY', 'GLUCOSE_MAX_Y', 'GLUCOSE_MIN_Y'], axis=1, errors='ignore')
     else:
         df = df.drop(['ADMITTIME', 'DISCHTIME', 'OUTTIME', 'INTIME', 'DOB', 'CHARTTIME_CREAT', 'CHARTTIME_UO', 'HADM_ID_x', 'Unnamed: 0', 'AKI_STAGE_CREAT',
-                     'AKI_STAGE_48HR', 'AKI_STAGE_UO', 'AKI_48HR', 'SUBJECT_ID_y', 'SUBJECT_ID_x.1', 'SUBJECT_ID_x', 'HADM_ID_y', 'GLUCOSE_MIN_y', 'GLUCOSE_MAX_y'], axis=1)
+                     'AKI_STAGE_48HR', 'AKI_STAGE_UO', 'AKI_48HR', 'SUBJECT_ID_y', 'SUBJECT_ID_x.1', 'SUBJECT_ID_x', 'HADM_ID_y', 'GLUCOSE_MIN_y', 'GLUCOSE_MAX_y'], axis=1, errors='ignore')
 
     return df
 
