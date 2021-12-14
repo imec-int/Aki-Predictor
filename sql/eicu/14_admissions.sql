@@ -1,6 +1,6 @@
 DROP MATERIALIZED VIEW IF EXISTS ADMISSIONS_VIEW CASCADE;
 CREATE MATERIALIZED VIEW ADMISSIONS_VIEW AS
-SELECT a.patientHealthSystemStayID AS subject_id, a.patientHealthSystemStayID AS hadm_id, -- no patientId/subjectId in eICU
+SELECT a.patientHealthSystemStayID AS subject_id, a.patientHealthSystemStayID AS hadm_id, a.patientUnitStayID AS icustay_id, -- no patientId/subjectId in eICU
   --a.admittime, a.dischtime, not actually used
   CASE
     WHEN a.ethnicity = 'African American' THEN 'BLACK/AFRICAN AMERICAN'
