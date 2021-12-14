@@ -1,6 +1,6 @@
 DROP MATERIALIZED VIEW IF EXISTS ADMISSIONS_VIEW CASCADE;
 CREATE MATERIALIZED VIEW ADMISSIONS_VIEW AS
-SELECT a.subject_id, a.hadm_id, a.admittime, a.dischtime, a.ethnicity,
+SELECT a.subject_id, a.hadm_id, a.icustay_id, a.admittime, a.dischtime, a.ethnicity,
   s.intime, s.outtime, s.los,
   p.gender, p.dob,
   EXTRACT(epoch FROM (a.dischtime - a.admittime))/3600 AS staytime,
