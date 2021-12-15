@@ -2,7 +2,7 @@ DROP MATERIALIZED VIEW IF EXISTS COMORBIDITIES CASCADE;
 CREATE MATERIALIZED VIEW COMORBIDITIES AS with icd as (
     select ha.patientHealthSystemStayID AS hadm_id,
         -- seq_num, not used
-        icd9code AS icd9_code
+        REPLACE(SUBSTRING(icd9code, '[(0-9\.]*'), '.', '') AS icd9_code
     from diagnosis d
          join patient ha USING (patientUnitStayID)
     where diagnosisPriority != 'Primary'
@@ -33,7 +33,7 @@ eliflg as (
                 FROM 1 for 3
             ) in ('428') then 1
             else 0
-        end as CHF,
+        end as CHF, --CONGESTIVE_HEART_FAILURE
         CASE
             when icd9_code in ('42613', '42610', '42612', '99601', '99604') then 1
             when SUBSTRING(
@@ -56,7 +56,7 @@ eliflg as (
                 'V533'
             ) then 1
             else 0
-        end as ARRHY,
+        end as ARRHY, --CARDIAC_ARRHYTHMIAS
         CASE
             when SUBSTRING(
                 icd9_code
@@ -67,7 +67,7 @@ eliflg as (
                 FROM 1 for 3
             ) in ('394', '395', '396', '397', '424') then 1
             else 0
-        end as VALVE,
+        end as VALVE, --VALVULAR_DISEASE
         CASE
             when SUBSTRING(
                 icd9_code
@@ -89,35 +89,35 @@ eliflg as (
                 FROM 1 for 3
             ) in ('440', '441') then 1
             else 0
-        end as PERIVASC,
+        end as PERIVASC, --PERIPHERAL_VASCULAR
         CASE
             when SUBSTRING(
                 icd9_code
                 FROM 1 for 3
             ) in ('401') then 1
             else 0
-        end as HTN,
+        end as HTN, --HYPERTENSION
         CASE
             when SUBSTRING(
                 icd9_code
                 FROM 1 for 3
             ) in ('402', '403', '404', '405') then 1
             else 0
-        end as HTNCX,
+        end as HTNCX, --HYPERTENSION
         CASE
             when SUBSTRING(
                 icd9_code
                 FROM 1 for 4
             ) in ('2500', '2501', '2502', '2503') then 1
             else 0
-        end as DM,
+        end as DM, --DIABETES_UNCOMPLICATED
         CASE
             when SUBSTRING(
                 icd9_code
                 FROM 1 for 4
             ) in ('2504', '2505', '2506', '2507', '2508', '2509') then 1
             else 0
-        end as DMCX,
+        end as DMCX, --DIABETES_COMPLICATED
         CASE
             when SUBSTRING(
                 icd9_code
@@ -128,7 +128,7 @@ eliflg as (
                 FROM 1 for 3
             ) in ('243', '244') then 1
             else 0
-        end as HYPOTHY,
+        end as HYPOTHY, --HYPOTHYROIDISM
         CASE
             when icd9_code in (
                 '40301',
@@ -150,7 +150,7 @@ eliflg as (
                 FROM 1 for 3
             ) in ('585', '586', 'V56') then 1
             else 0
-        end as RENLFAIL,
+        end as RENLFAIL, --RENAL_FAILURE
         CASE
             when icd9_code in ('07022', '07023', '07032', '07033', '07044', '07054') then 1
             when SUBSTRING(
@@ -177,60 +177,60 @@ eliflg as (
                 FROM 1 for 3
             ) in ('570', '571') then 1
             else 0
-        end as LIVER,
-        CASE
-            when icd9_code in ('72889', '72930') then 1
-            when SUBSTRING(
-                icd9_code
-                FROM 1 for 4
-            ) in (
-                '7010',
-                '7100',
-                '7101',
-                '7102',
-                '7103',
-                '7104',
-                '7108',
-                '7109',
-                '7112',
-                '7193',
-                '7285'
-            ) then 1
-            when SUBSTRING(
-                icd9_code
-                FROM 1 for 3
-            ) in ('446', '714', '720', '725') then 1
-            else 0
-        end as ARTH,
-        CASE
-            when SUBSTRING(
-                icd9_code
-                FROM 1 for 4
-            ) in ('2871', '2873', '2874', '2875') then 1
-            when SUBSTRING(
-                icd9_code
-                FROM 1 for 3
-            ) in ('286') then 1
-            else 0
-        end as COAG,
+        end as LIVER, --LIVER_DISEASE
+        --CASE
+        --    when icd9_code in ('72889', '72930') then 1
+        --    when SUBSTRING(
+        --        icd9_code
+        --        FROM 1 for 4
+        --    ) in (
+        --        '7010',
+        --        '7100',
+        --        '7101',
+        --        '7102',
+        --        '7103',
+        --        '7104',
+        --        '7108',
+        --        '7109',
+        --        '7112',
+        --        '7193',
+        --        '7285'
+        --    ) then 1
+        --    when SUBSTRING(
+        --        icd9_code
+        --        FROM 1 for 3
+        --    ) in ('446', '714', '720', '725') then 1
+        --    else 0
+        --end as ARTH, --not used
+        --CASE
+        --    when SUBSTRING(
+        --        icd9_code
+        --        FROM 1 for 4
+        --    ) in ('2871', '2873', '2874', '2875') then 1
+        --    when SUBSTRING(
+        --        icd9_code
+        --        FROM 1 for 3
+        --    ) in ('286') then 1
+        --    else 0
+        --end as COAG, --not used
         CASE
             when SUBSTRING(
                 icd9_code
                 FROM 1 for 4
             ) in ('2780') then 1
             else 0
-        end as OBESE,
-        CASE
-            when SUBSTRING(
-                icd9_code
-                FROM 1 for 4
-            ) in ('2536') then 1
-            when SUBSTRING(
-                icd9_code
-                FROM 1 for 3
-            ) in ('276') then 1
-            else 0
-        end as LYTES,
+        end as OBESE, --OBESITY
+        --CASE
+        --    when SUBSTRING(
+        --        icd9_code
+        --        FROM 1 for 4
+        --    ) in ('2536') then 1
+        --    when SUBSTRING(
+        --        icd9_code
+        --        FROM 1 for 3
+        --    ) in ('276') then 1
+        --    else 0
+        --end as LYTES, --not used
         CASE
             when SUBSTRING(
                 icd9_code
@@ -260,7 +260,7 @@ eliflg as (
                 FROM 1 for 3
             ) in ('980') then 1
             else 0
-        end as ALCOHOL,
+        end as ALCOHOL, --ALCOHOL_ABUSE
         CASE
             when icd9_code in ('V6542') then 1
             when SUBSTRING(
@@ -281,7 +281,7 @@ eliflg as (
                 FROM 1 for 3
             ) in ('292', '304') then 1
             else 0
-        end as DRUG
+        end as DRUG --DRUG_ABUSE
     from icd
 ),
 eligrp as (
@@ -297,10 +297,10 @@ eligrp as (
         max(dmcx) as dmcx,
         max(hypothy) as hypothy,
         max(liver) as liver,
-        max(arth) as arth,
-        max(coag) as coag,
+        --max(arth) as arth, not used
+        --max(coag) as coag, not used
         max(obese) as obese,
-        max(lytes) as lytes,
+        --max(lytes) as lytes, not used
         max(alcohol) as alcohol,
         max(drug) as drug
     from eliflg

@@ -215,6 +215,7 @@ def compute_metrics(ytest, ypred, runname, output_path, multiclass):
     
     disp = ConfusionMatrixDisplay(confusion_matrix=C)
     disp.plot() #you need to call this function, otherwise the plot is not being generated and we can't save it
+    Path(output_path / 'metrics').mkdir(parents=True, exist_ok=True)
     plt.savefig(Path(output_path / 'metrics' / "{}.png".format(runname)))
     
     # normed_C = normalize(C, axis=1, norm='l1')
