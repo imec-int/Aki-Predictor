@@ -7,16 +7,16 @@ dependencies:
   - psycopg2==2.9.2
   - SQLAlchemy==1.4.27
   - pandas==1.3.4
-  - fastparquet
-  - python-snappy
-  - jupyterlab=3.2
-  - nb_conda_kernels  
-  - plotly
-  - plotly_express 
-  - python-kaleido
-  - keras
-  - scikit-learn
-  - matplotlib
+  - fastparquet==0.5.0
+  - python-snappy==0.6.0
+  - jupyterlab==3.2
+  - nb_conda_kernels==2.3.1
+  - plotly==5.4.0
+  - plotly_express==0.4.1
+  - python-kaleido==0.2.1
+  - keras==2.7.0
+  - scikit-learn==1.0.1
+  - matplotlib==3.4.3
   - pip
   - pip:
     - tensorflow==2.7
