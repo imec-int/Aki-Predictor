@@ -53,6 +53,7 @@ FROM (
             END AS RespRate,
             CASE
                 WHEN ce.temperature > 45 THEN NULL
+                WHEN ce.temperature < 15 THEN NULL
                 ELSE ce.temperature
             END AS TempC,
             ce.saO2 AS SpO2 -- this is actually not correct, but close enough
