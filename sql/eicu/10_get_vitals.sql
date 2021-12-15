@@ -35,11 +35,26 @@ FROM (
             ie.patientHealthSystemStayID AS hadm_id,
             ie.patientUnitStayID AS icustay_id,
             ce.heartRate AS HeartRate,
-            ce.systemicSystolic AS SysBP,
-            ce.systemicDiastolic AS DiasBP,
-            ce.systemicMean AS MeanBP,
-            ce.respiration AS RespRate,
-            ce.temperature AS TempC,
+            CASE
+                WHEN ce.systemicSystolic < 0 THEN NULL
+                ELSE ce.systemicSystolic
+            END AS SysBP,
+            CASE
+                WHEN ce.systemicDiastolic < 0 THEN NULL
+                ELSE ce.systemicDiastolic
+            END AS DiasBP,
+            CASE
+                WHEN ce.systemicMean < 0 THEN NULL
+                ELSE ce.systemicMean
+            END AS MeanBP,
+            CASE
+                WHEN ce.respiration > 1000 THEN NULL
+                ELSE ce.respiration
+            END AS RespRate,
+            CASE
+                WHEN ce.temperature > 45 THEN NULL
+                ELSE ce.temperature
+            END AS TempC,
             ce.saO2 AS SpO2 -- this is actually not correct, but close enough
             --TODO glucose from lab?
         FROM patient ie
