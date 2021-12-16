@@ -61,7 +61,7 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
           info_save['COUNTTIMESGOICU'].max())
 
     c_aki_7d = read_queried(dbname, aki_sql_results)
-    
+
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
     print('NORMAL Patients in 7DAY: {}'.format(
         c_aki_7d.loc[c_aki_7d['AKI_STAGE_7DAY'] == 0]['ICUSTAY_ID'].count()))
@@ -94,7 +94,7 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
     renal_diagnoses = diagnoses.loc[diagnoses['RENAL_FAILURE'] == 1]
 
     diagnoses_check = read_queried(dbname, 'DIAGNOSES_ICD.parquet')
-    
+
     check_aki_before_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
         ['5845', '5846', '5847', '5848'])]
     check_CKD_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
@@ -152,7 +152,7 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
     df_save = pd.merge(info_save, chart, how='left', on='ICUSTAY_ID')
 
     comorbidities = read_queried(dbname, 'comorbidities.parquet')
-    
+
     info_save = pd.merge(df_save, comorbidities, how='left', on='HADM_ID')
     #info_save = info_save.drop(columns=['UNNAMED: 0'])
 
@@ -171,7 +171,6 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
 
     with open_preprocessed_to_write(dbname, aki_out_dataset) as f:
         info_save.to_csv(f, encoding='utf-8', header=True)
-        info_save.to_parquet(f, encoding='utf-8', header=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

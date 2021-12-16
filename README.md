@@ -29,30 +29,18 @@ We also included co-morbidities such as congestive heart failure,  hypertension,
 [jupyter notebook](data_exploration.ipynb).)
 
 6. Execute one of the following commands to clean and preprocess the csv files generated from the data extraction step:
-   - `python aki-preprocess.py --dbname mimiciii`
-   - `python aki-preprocess.py --dbname eicu`
+   - `python aki_preprocess.py --dbname mimiciii`
+   - `python aki_preprocess.py --dbname eicu`
 7. To run the machine learning model run according to the database:
--  `python aki-ml.py --dbname mimiciii`
--  `python aki-ml.py --dbname eicu`
+-  `python aki_ml.py --dbname mimiciii`
+-  `python aki_ml.py --dbname eicu`
 
 
-The scripts contains the following functions:
+The aki_ml.py script contain the following functions:
 
-* run_aki_model: predicts wether a patient will develop AKI withnin the first 7 days of its stay and which stage of AKI it is according to the KIDIGO guidelines.
-* cluster_ethnicity: subsets the data  by  ethnicity:  train  on  ”Caucasian”  (all variants),  predict  for  all  other  ethnicities.   
+* run_aki_model: predicts wether a patient will develop AKI within the first 7 days of its stay and which stage of AKI it is according to the KIDIGO guidelines.
+* cluster_ethnicity: subsets the data  by  ethnicity:  train  on  "Caucasian"  (all variants),  predict  for  all  other  ethnicities.   
 * change_data_size: does random subsampling of available training data
-
-## Conda environment
-
-Included in this repository is a conda environment, listing the needed dependencies
-
-    conda env create --name aki-predictor -f environment.yml
-    conda activate aki-predictor 
-
-## Environment variable
-
-Create an .env file (based on .env.template) and fill in the variables to update the database credentials and information.
-If the .env file is missing, a database connection to localhost will be used
 
 ## AKI-ML output
 

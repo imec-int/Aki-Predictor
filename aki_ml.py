@@ -1,6 +1,8 @@
 
 import time
 import csv
+from functools import partial
+
 import numpy as np
 
 import os
@@ -33,7 +35,7 @@ from keras.utils.vis_utils import plot_model
 
 from keras.layers import Activation
 # from keras.utils import to_categorical #prior version of TF
-from tensorflow.keras.utils import to_categorical #TF2.7 
+from tensorflow.keras.utils import to_categorical #TF2.7
 
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -131,18 +133,15 @@ def code_ethnicity(ethinicity):
 
 
 def code_gender(gender):
-
     if (gender == 'F'):
         return 0
     else:
         return 1
 
 
-def cleanup_data(dbname, filename):
-
+def cleanup_data(file_path):
     # read the data from the CSV
-    df = pd.read_csv(
-        open(Path(Path.cwd() / 'data' / dbname / 'preprocessed' / filename), "r"), delimiter=",")
+    df = pd.read_csv(open(file_path, "r"), delimiter=",")
 
     df.columns = map(str.upper, df.columns)
     print(df.shape)
@@ -165,12 +164,13 @@ def cleanup_data(dbname, filename):
     print(df.groupby('ETHNICITY')['ICUSTAY_ID'].nunique())
 
     df = df.rename(columns={'HADM_ID_X': 'HADM_ID', 'GLUCOSE_MIN_X': 'GLUCOSE_MIN',
-                   'GLUCOSE_MAX_X': 'GLUCOSE_MAX', 'SUBJECT_ID_Y': 'SUBJECT_ID', 'SUBJECT_ID_X.1': 'SUBJECT_ID'})
+                            'GLUCOSE_MAX_X': 'GLUCOSE_MAX', 'SUBJECT_ID_Y': 'SUBJECT_ID',
+                            'SUBJECT_ID_X.1': 'SUBJECT_ID'})
     df = df.fillna(0)
 
-   # df = df.fillna(df.mean())
+    # df = df.fillna(df.mean())
 
-    #print(pd.isna(df) == True)
+    # print(pd.isna(df) == True)
 
     df = df.drop(df.columns[1], axis=1)
 
@@ -179,25 +179,27 @@ def cleanup_data(dbname, filename):
     if 'AKI_7DAY' in df.columns:
         # ,  'SUBJECT_ID_x','GLUCOSE_MIN_y', 'GLUCOSE_MAX_y'
         df = df.drop(['ADMITTIME', 'DISCHTIME', 'OUTTIME', 'INTIME', 'DOB', 'CHARTTIME_CREAT',
-                     'UNNAMED: 0', 'AKI_STAGE_CREAT', 'AKI_7DAY', 'GLUCOSE_MAX_Y', 'GLUCOSE_MIN_Y'], axis=1, errors='ignore')
+                      'UNNAMED: 0', 'AKI_STAGE_CREAT', 'AKI_7DAY', 'GLUCOSE_MAX_Y', 'GLUCOSE_MIN_Y'], axis=1,
+                     errors='ignore')
     else:
-        df = df.drop(['ADMITTIME', 'DISCHTIME', 'OUTTIME', 'INTIME', 'DOB', 'CHARTTIME_CREAT', 'CHARTTIME_UO', 'HADM_ID_x', 'Unnamed: 0', 'AKI_STAGE_CREAT',
-                     'AKI_STAGE_48HR', 'AKI_STAGE_UO', 'AKI_48HR', 'SUBJECT_ID_y', 'SUBJECT_ID_x.1', 'SUBJECT_ID_x', 'HADM_ID_y', 'GLUCOSE_MIN_y', 'GLUCOSE_MAX_y'], axis=1, errors='ignore')
+        df = df.drop(
+            ['ADMITTIME', 'DISCHTIME', 'OUTTIME', 'INTIME', 'DOB', 'CHARTTIME_CREAT', 'CHARTTIME_UO', 'HADM_ID_x',
+             'Unnamed: 0', 'AKI_STAGE_CREAT',
+             'AKI_STAGE_48HR', 'AKI_STAGE_UO', 'AKI_48HR', 'SUBJECT_ID_y', 'SUBJECT_ID_x.1', 'SUBJECT_ID_x',
+             'HADM_ID_y', 'GLUCOSE_MIN_y', 'GLUCOSE_MAX_y'], axis=1, errors='ignore')
 
     return df
 
 
 def accuracy_confusion(confusion_matrix):
-
     diagonal_sum = confusion_matrix.trace()
     sum_of_all_elements = confusion_matrix.sum()
     return diagonal_sum / sum_of_all_elements
 
 
 def compute_metrics(ytest, ypred, runname, output_path, multiclass):
-    
-    runfile = Path(output_path / 'metrics'/ "{}.json".format(runname))
-    
+    runfile = Path(output_path / 'metrics' / "{}.json".format(runname))
+
     if multiclass == True:
         lb = preprocessing.LabelBinarizer()
         lb.fit(ytest)
@@ -212,20 +214,20 @@ def compute_metrics(ytest, ypred, runname, output_path, multiclass):
         # save_dict(runname=runfile, classification_report=class_rep)
         print(class_rep)  # , labels=[0, 1, 2, 3]))
         C = confusion_matrix(ytest, ypred)
-    
+
     disp = ConfusionMatrixDisplay(confusion_matrix=C)
-    disp.plot() #you need to call this function, otherwise the plot is not being generated and we can't save it
+    disp.plot()  # you need to call this function, otherwise the plot is not being generated and we can't save it
     Path(output_path / 'metrics').mkdir(parents=True, exist_ok=True)
     plt.savefig(Path(output_path / 'metrics' / "{}.png".format(runname)))
-    
+
     # normed_C = normalize(C, axis=1, norm='l1')
 
     metrics_dict = dict()
-    metrics_dict["classification_report"]=class_rep
-    metrics_dict["confusion_matrix"]=C.tolist()
-    metrics_dict["accuracy confusion matrix"]=accuracy_confusion(C).tolist()
-    metrics_dict["Area Under ROC"]=metrics.roc_auc_score(ytest, ypred).tolist()
-    metrics_dict["Accuracy score"]=accuracy_score(ytest, ypred).tolist()
+    metrics_dict["classification_report"] = class_rep
+    metrics_dict["confusion_matrix"] = C.tolist()
+    metrics_dict["accuracy confusion matrix"] = accuracy_confusion(C).tolist()
+    metrics_dict["Area Under ROC"] = metrics.roc_auc_score(ytest, ypred).tolist()
+    metrics_dict["Accuracy score"] = accuracy_score(ytest, ypred).tolist()
     with open(runfile, 'w') as f:
         json.dump(metrics_dict, f)
     return disp
@@ -236,8 +238,8 @@ def aki_model(X, Y, X_test, Y_test, filename, savepath):
     function to create and train the model
     I've added a Tensorboard as an extra callback (in comparison with ExaScience code)
     '''
-    log_dir = Path( savepath / 'logs' /  filename / 
-        datetime.datetime.now().strftime("%Y%m%d-%H%M%S") )
+    log_dir = Path(savepath / 'logs' / filename /
+                   datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     callbacks = [
         tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10),
         tf.keras.callbacks.TensorBoard(log_dir=log_dir)
@@ -266,7 +268,7 @@ def aki_model(X, Y, X_test, Y_test, filename, savepath):
     model.compile(loss='categorical_crossentropy',
                   optimizer='adam', metrics=['accuracy'])
 
-    model.fit(X, Y, epochs=1000, callbacks=callbacks, verbose='auto',use_multiprocessing=True) 
+    model.fit(X, Y, epochs=1000, callbacks=callbacks, verbose='auto', use_multiprocessing=True)
 
     weights_path = Path(savepath / 'weights' / '{}.weights'.format(filename))
     model.save_weights(weights_path)
@@ -301,35 +303,37 @@ def normalize_df(df):
     df.iloc[:, 2:] = scaler.transform(df.iloc[:, 2:])
     return df
 
+
 def create_datasets(df, split: float):
     '''
     a function returning a randomnly splitted dataset, with labels per set
     parameters:
     - df: the dataframe to split
-    - split: a floating point value between 0 and 1 to define the ratio of the test set. The training set is the leftover. 
+    - split: a floating point value between 0 and 1 to define the ratio of the test set. The training set is the leftover.
     '''
     # drop the AKI column as it's not needed
     dataframe = df.drop(['AKI'], axis=1)
-    train, test = train_test_split(dataframe, test_size=split, train_size=1-split)
+    train, test = train_test_split(dataframe, test_size=split, train_size=1 - split)
     # Parameter `AKI_STAGE_7DAY` is the label which we want to predict with our model, so we remove it from the dataset
     label_train = train.pop('AKI_STAGE_7DAY')
     label_test = test.pop('AKI_STAGE_7DAY')
     return train, label_train, test, label_test
 
+
 def run_aki_model(df, filename, dbname):
-    '''
-    in run aki model, we'll prepare the dataset to feed it to a ML model, after which we fit the model and save all metrics
-    '''
+    """
+    in run aki model, we'll prepare the dataset to feed it to an ML model, after which we fit the model and save all metrics
+    """
     # filename is the name of the output file, as we'll link a model to its generated features.
     # we'll add the time of execution in the filename, as to have an easy identifier
-    filename = '{}_{}'.format(filename, datetime.datetime.now().strftime("%Y%m%d-%H%M%S") )
+    filename = '{}_{}'.format(filename, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     savepath = Path(Path.cwd() / 'data' / dbname / 'model')
-    #first we'll normalize all the data
+    # first we'll normalize all the data
     df_norm = normalize_df(df)
-    #Then we'll randomnly split the dataset in training and testing sets, with accompanying labels
+    # Then we'll randomnly split the dataset in training and testing sets, with accompanying labels
     train, train_label, test, test_label = create_datasets(df=df_norm, split=0.2)
     print('training examples: {} ,label: {}'.format(train.shape, to_categorical(train_label).shape))
-    print('test examples: {}, label: {}'.format(test.shape,to_categorical(test_label).shape))
+    print('test examples: {}, label: {}'.format(test.shape, to_categorical(test_label).shape))
 
     # We create and train the model
     Y_pred_train, Y_pred_test = aki_model(train, to_categorical(
@@ -339,7 +343,6 @@ def run_aki_model(df, filename, dbname):
 
 
 def cluster_ethnicity(df):
-
     print("start ethinicty clustering")
 
     caucasian = df.loc[df['ETHNICITY'] == 0]
@@ -377,7 +380,7 @@ def cluster_ethnicity(df):
 
     caucasian_train, caucasian_test = create_datasets(caucasian, 0.2)
     #  make_train_test(
-        # caucasian, 0.2, seed=1234)
+    # caucasian, 0.2, seed=1234)
 
     X_caucasian_train = caucasian_train.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_caucasian_train = caucasian_train['AKI_STAGE_7DAY']
@@ -385,7 +388,7 @@ def cluster_ethnicity(df):
     X_caucasian_test = caucasian_test.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_caucasian_test = caucasian_test['AKI_STAGE_7DAY']
 
-    african_train, african_test = create_datasets(african, 0.2)#make_train_test(african, 0.2, seed=1234)
+    african_train, african_test = create_datasets(african, 0.2)  # make_train_test(african, 0.2, seed=1234)
 
     X_african_train = african_train.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_african_train = african_train['AKI_STAGE_7DAY']
@@ -393,7 +396,7 @@ def cluster_ethnicity(df):
     X_african_test = african_test.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_african_test = african_test['AKI_STAGE_7DAY']
 
-    hispanic_train, hispanic_test = create_datasets(hispanic, 0.2)#make_train_test(hispanic, 0.2, seed=1234)
+    hispanic_train, hispanic_test = create_datasets(hispanic, 0.2)  # make_train_test(hispanic, 0.2, seed=1234)
 
     X_hispanic_train = hispanic_train.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_hispanic_train = hispanic_train['AKI_STAGE_7DAY']
@@ -401,8 +404,9 @@ def cluster_ethnicity(df):
     X_hispanic_test = hispanic_test.drop(['AKI', 'AKI_STAGE_7DAY'], axis=1)
     Y_hispanic_test = hispanic_test['AKI_STAGE_7DAY']
 
-    others_non_caucasian_train, others_non_caucasian_test = create_datasets(others_non_caucasian, 0.2)#make_train_test(
-        # others_non_caucasian, 0.2, seed=1234)
+    others_non_caucasian_train, others_non_caucasian_test = create_datasets(others_non_caucasian,
+                                                                            0.2)  # make_train_test(
+    # others_non_caucasian, 0.2, seed=1234)
 
     X_others_non_caucasian_train = others_non_caucasian_train.drop(
         ['AKI', 'AKI_STAGE_7DAY'], axis=1)
@@ -434,13 +438,13 @@ def cluster_ethnicity(df):
             Y_caucasian_train).shape[1], activation=tf.nn.softmax),
     ])
     #
-    #tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     model.compile(loss='categorical_crossentropy',
                   optimizer='adam', metrics=['accuracy'])
 
     model.fit(X_caucasian_train, to_categorical(Y_caucasian_train), epochs=1000, callbacks=[
-              callback], verbose=0)  # Run with 1 epoch to speed things up for demo purposes
+        callback], verbose=0)  # Run with 1 epoch to speed things up for demo purposes
 
     Y_caucasian_test_pred = model.predict_classes(X_caucasian_test)
     Y_others_non_caucasian_pred = model.predict_classes(X_others_non_caucasian)
@@ -455,12 +459,11 @@ def cluster_ethnicity(df):
 
 
 def split_randomly(df, ratio, str):
-
     scaler.fit(df.iloc[:, 2:])
 
     df.iloc[:, 2:] = scaler.transform(df.iloc[:, 2:])
 
-    df_train, df_test = create_datasets(df, ratio)#make_train_test(df, ratio, seed=1234)
+    df_train, df_test = create_datasets(df, ratio)  # make_train_test(df, ratio, seed=1234)
 
     X_train = df_train.drop(['AKI_STAGE_7DAY', 'AKI'], axis=1)
     Y_train = df_train['AKI_STAGE_7DAY']
@@ -475,7 +478,6 @@ def split_randomly(df, ratio, str):
 
 
 def change_data_size(df):
-
     print("random subsampling")
 
     split_randomly(df, 0.02, "2% test size")
@@ -490,41 +492,63 @@ def change_data_size(df):
     split_randomly(df, 0.95, "95% test size")
 
 
+def build_preprocess_file_path(dbname, file_name):
+    return Path(Path.cwd() / 'data' / dbname / 'preprocessed' / file_name)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dbname", type=str, help="choose database name: eicu or mimiciii", choices=[
-                        'eicu', 'mimiciii'])
+        'eicu', 'mimiciii'])
     args = parser.parse_args()
-    dbname = 'eicu' # default
+    dbname = 'eicu'  # default
     if args.dbname:
         dbname = args.dbname
 
-    # "INFO_DATASET_7days_creatinine_withcomorbidities.csv"
-    df = cleanup_data(dbname, "INFO_DATASET_7days_creatinine2.csv")
+    preprocessed_file_path = partial(build_preprocess_file_path, dbname)
 
+    df = cleanup_data(preprocessed_file_path("INFO_DATASET_7days_creatinine2.csv"))
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
 
-    df = df[['AKI', 'AKI_STAGE_7DAY', 'CREATININE_MAX', 'CREATININE_MIN', 'CREAT', 'EGFR', 'POTASSIUM_MAX', 'GLUCOSE_MAX', 'PLATELET_MIN',
-             'BUN_MAX', 'WBC_MIN', 'PLATELET_MAX', 'TEMPC_MEAN', 'GLUCOSE_MEAN', 'PTT_MAX', 'TEMPC_MIN', 'BUN_MIN', 'HEMATOCRIT_MIN',
-             'SPO2_MEAN', 'MEANBP_MEAN', 'AGE', 'HEARTRATE_MEAN', 'PT_MAX', 'TEMPC_MAX', 'RESPRATE_MEAN', 'CHLORIDE_MAX', 'GLUCOSE_MIN', 'WBC_MAX',
-             'DIASBP_MEAN', 'SYSBP_MAX', 'DIASBP_MIN', 'CHLORIDE_MIN', 'SPO2_MIN', 'HEARTRATE_MAX', 'HEMOGLOBIN_MAX', 'SYSBP_MEAN', 'HEMATOCRIT_MAX', 'DIASBP_MAX',
-             'HEARTRATE_MIN', 'SYSBP_MIN', 'SODIUM_MIN', 'MEANBP_MAX', 'BICARBONATE_MAX', 'MEANBP_MIN', 'SODIUM_MAX', 'ANIONGAP_MAX', 'ANIONGAP_MIN', 'HEMOGLOBIN_MIN',
-             'LACTATE_MIN', 'BICARBONATE_MIN', 'PTT_MIN', 'PT_MIN', 'BILIRUBIN_MAX', 'RESPRATE_MIN', 'LACTATE_MAX', 'RESPRATE_MAX', 'ALBUMIN_MIN', 'POTASSIUM_MIN', 'INR_MAX',
-             'ALBUMIN_MAX', 'BILIRUBIN_MIN', 'INR_MIN', 'BANDS_MIN', 'ETHNICITY', 'BANDS_MAX', 'HYPERTENSION', 'DIABETES_UNCOMPLICATED', 'VALVULAR_DISEASE',
-             'CONGESTIVE_HEART_FAILURE', 'SPO2_MAX', 'ALCOHOL_ABUSE', 'GENDER', 'CARDIAC_ARRHYTHMIAS', 'PERIPHERAL_VASCULAR', 'OBESITY', 'HYPOTHYROIDISM', 'DIABETES_COMPLICATED',
-             'LIVER_DISEASE', 'DRUG_ABUSE', 'RENAL_FAILURE']]
+    df = df[
+        ['AKI', 'AKI_STAGE_7DAY', 'CREATININE_MAX', 'CREATININE_MIN', 'CREAT', 'EGFR', 'POTASSIUM_MAX', 'GLUCOSE_MAX',
+         'PLATELET_MIN',
+         'BUN_MAX', 'WBC_MIN', 'PLATELET_MAX', 'TEMPC_MEAN', 'GLUCOSE_MEAN', 'PTT_MAX', 'TEMPC_MIN', 'BUN_MIN',
+         'HEMATOCRIT_MIN',
+         'SPO2_MEAN', 'MEANBP_MEAN', 'AGE', 'HEARTRATE_MEAN', 'PT_MAX', 'TEMPC_MAX', 'RESPRATE_MEAN', 'CHLORIDE_MAX',
+         'GLUCOSE_MIN', 'WBC_MAX',
+         'DIASBP_MEAN', 'SYSBP_MAX', 'DIASBP_MIN', 'CHLORIDE_MIN', 'SPO2_MIN', 'HEARTRATE_MAX', 'HEMOGLOBIN_MAX',
+         'SYSBP_MEAN', 'HEMATOCRIT_MAX', 'DIASBP_MAX',
+         'HEARTRATE_MIN', 'SYSBP_MIN', 'SODIUM_MIN', 'MEANBP_MAX', 'BICARBONATE_MAX', 'MEANBP_MIN', 'SODIUM_MAX',
+         'ANIONGAP_MAX', 'ANIONGAP_MIN', 'HEMOGLOBIN_MIN',
+         'LACTATE_MIN', 'BICARBONATE_MIN', 'PTT_MIN', 'PT_MIN', 'BILIRUBIN_MAX', 'RESPRATE_MIN', 'LACTATE_MAX',
+         'RESPRATE_MAX', 'ALBUMIN_MIN', 'POTASSIUM_MIN', 'INR_MAX',
+         'ALBUMIN_MAX', 'BILIRUBIN_MIN', 'INR_MIN', 'BANDS_MIN', 'ETHNICITY', 'BANDS_MAX', 'HYPERTENSION',
+         'DIABETES_UNCOMPLICATED', 'VALVULAR_DISEASE',
+         'CONGESTIVE_HEART_FAILURE', 'SPO2_MAX', 'ALCOHOL_ABUSE', 'GENDER', 'CARDIAC_ARRHYTHMIAS',
+         'PERIPHERAL_VASCULAR', 'OBESITY', 'HYPOTHYROIDISM', 'DIABETES_COMPLICATED',
+         'LIVER_DISEASE', 'DRUG_ABUSE', 'RENAL_FAILURE']]
     # INFO_DATASET_7days_creatinine+urine_withcomorbidities.csv
-    df2 = cleanup_data(dbname, "INFO_DATASET_7days_creatinine+urine2.csv")
+    df2 = cleanup_data(preprocessed_file_path("INFO_DATASET_7days_creatinine+urine2.csv"))
     df2 = df2.replace([np.inf, -np.inf], np.nan).dropna()
 
-    df2 = df2[['AKI', 'AKI_STAGE_7DAY', 'UO_RT_24HR', 'UO_RT_12HR', 'UO_RT_6HR', 'CREATININE_MAX', 'CREATININE_MIN', 'CREAT', 'EGFR', 'PLATELET_MAX', 'WBC_MAX', 'BUN_MAX',
-               'PLATELET_MIN', 'AGE', 'GLUCOSE_MIN', 'TEMPC_MIN', 'WBC_MIN', 'GLUCOSE_MAX', 'DIASBP_MEAN', 'BUN_MIN', 'RESPRATE_MEAN', 'SYSBP_MAX', 'POTASSIUM_MAX', 'CHLORIDE_MAX',
-               'HEARTRATE_MAX', 'HEARTRATE_MEAN', 'SPO2_MEAN', 'PTT_MAX', 'MEANBP_MEAN', 'CHLORIDE_MIN', 'GLUCOSE_MEAN', 'PTT_MIN', 'TEMPC_MAX', 'MEANBP_MIN', 'ANIONGAP_MAX', 'SODIUM_MIN',
-               'HEMOGLOBIN_MAX', 'HEMATOCRIT_MAX', 'MEANBP_MAX', 'DIASBP_MAX', 'HEMATOCRIT_MIN', 'SPO2_MIN', 'SODIUM_MAX', 'TEMPC_MEAN', 'DIASBP_MIN',
-               'HEARTRATE_MIN', 'RESPRATE_MAX', 'HEMOGLOBIN_MIN', 'BICARBONATE_MAX', 'SYSBP_MIN', 'SYSBP_MEAN', 'BICARBONATE_MIN', 'POTASSIUM_MIN',
-               'BILIRUBIN_MAX', 'LACTATE_MAX', 'ANIONGAP_MIN', 'ALBUMIN_MAX', 'PT_MIN', 'BILIRUBIN_MIN', 'INR_MIN', 'ALBUMIN_MIN', 'RESPRATE_MIN', 'PT_MAX',
-               'ETHNICITY', 'LACTATE_MIN', 'INR_MAX', 'BANDS_MAX', 'BANDS_MIN', 'HYPERTENSION', 'HYPOTHYROIDISM', 'CONGESTIVE_HEART_FAILURE', 'GENDER', 'CARDIAC_ARRHYTHMIAS', 'SPO2_MAX',
-               'ALCOHOL_ABUSE', 'DRUG_ABUSE', 'VALVULAR_DISEASE', 'OBESITY', 'PERIPHERAL_VASCULAR', 'DIABETES_COMPLICATED', 'LIVER_DISEASE', 'DIABETES_UNCOMPLICATED', 'RENAL_FAILURE']]
+    df2 = df2[
+        ['AKI', 'AKI_STAGE_7DAY', 'UO_RT_24HR', 'UO_RT_12HR', 'UO_RT_6HR', 'CREATININE_MAX', 'CREATININE_MIN', 'CREAT',
+         'EGFR', 'PLATELET_MAX', 'WBC_MAX', 'BUN_MAX',
+         'PLATELET_MIN', 'AGE', 'GLUCOSE_MIN', 'TEMPC_MIN', 'WBC_MIN', 'GLUCOSE_MAX', 'DIASBP_MEAN', 'BUN_MIN',
+         'RESPRATE_MEAN', 'SYSBP_MAX', 'POTASSIUM_MAX', 'CHLORIDE_MAX',
+         'HEARTRATE_MAX', 'HEARTRATE_MEAN', 'SPO2_MEAN', 'PTT_MAX', 'MEANBP_MEAN', 'CHLORIDE_MIN', 'GLUCOSE_MEAN',
+         'PTT_MIN', 'TEMPC_MAX', 'MEANBP_MIN', 'ANIONGAP_MAX', 'SODIUM_MIN',
+         'HEMOGLOBIN_MAX', 'HEMATOCRIT_MAX', 'MEANBP_MAX', 'DIASBP_MAX', 'HEMATOCRIT_MIN', 'SPO2_MIN', 'SODIUM_MAX',
+         'TEMPC_MEAN', 'DIASBP_MIN',
+         'HEARTRATE_MIN', 'RESPRATE_MAX', 'HEMOGLOBIN_MIN', 'BICARBONATE_MAX', 'SYSBP_MIN', 'SYSBP_MEAN',
+         'BICARBONATE_MIN', 'POTASSIUM_MIN',
+         'BILIRUBIN_MAX', 'LACTATE_MAX', 'ANIONGAP_MIN', 'ALBUMIN_MAX', 'PT_MIN', 'BILIRUBIN_MIN', 'INR_MIN',
+         'ALBUMIN_MIN', 'RESPRATE_MIN', 'PT_MAX',
+         'ETHNICITY', 'LACTATE_MIN', 'INR_MAX', 'BANDS_MAX', 'BANDS_MIN', 'HYPERTENSION', 'HYPOTHYROIDISM',
+         'CONGESTIVE_HEART_FAILURE', 'GENDER', 'CARDIAC_ARRHYTHMIAS', 'SPO2_MAX',
+         'ALCOHOL_ABUSE', 'DRUG_ABUSE', 'VALVULAR_DISEASE', 'OBESITY', 'PERIPHERAL_VASCULAR', 'DIABETES_COMPLICATED',
+         'LIVER_DISEASE', 'DIABETES_UNCOMPLICATED', 'RENAL_FAILURE']]
 
     run_aki_model(df, "creatinine_model", dbname)
     run_aki_model(df2, "creatinine_urine_model", dbname)

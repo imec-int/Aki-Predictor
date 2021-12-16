@@ -1,10 +1,15 @@
+import argparse
 import os
+import sys
+from pathlib import Path
+
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from pathlib import Path
-import argparse
+
+MIMIC_III = 'mimiciii'
+EICU = 'eicu'
 
 
 def test_postgres(cursor):
@@ -51,29 +56,36 @@ AND schemaname != 'information_schema';
         print("Head of extracted pandas DF:")
         print(df.head())
 
-def execute_sql(cursor, path):
+
+def execute_sql(conn, path):
+    print('Executing SQL files')
+
     for i in sorted(os.listdir(path)):
-        print("accessing file: "+i)
-        sql_file = open(os.path.join(path, i), 'r')
-        cursor.execute(sql_file.read())
+        cur = conn.cursor()
+        try:
+            print("accessing file: " + i)
+            sql_file = open(os.path.join(path, i), 'r')
+            cur.execute(sql_file.read())
+            conn.commit()
+        finally:
+            cur.close()
+
 
 def save_sql(conn, sql_path, save_path):
     save_path.mkdir(parents=True, exist_ok=True)
     for i in sorted(os.listdir(sql_path)):
-      # we split on the dot, the second part is the name of the file to save, the first part is the order of execution, last is extension
+        # we split on the dot, the second part is the name of the file to save, the first part is the order of execution, last is extension
         filename = i.split(".")[1]
-        print("accessing save file: "+filename)
+        print("accessing save file: " + filename)
         sql_file = open(os.path.join(sql_path, i), 'r')
         df = pd.read_sql_query(sql_file.read(), conn)
         # df.to_csv(os.path.join(save_path, filename+".csv"),
         #           encoding='utf-8', header=True)
-        df.to_parquet(path=os.path.join(save_path, filename+".parquet"))
+        df.to_parquet(path=os.path.join(save_path, filename + ".parquet"))
 
 
-def run(dbname):
-    print(dbname)
-    # MIMIC
-    if(dbname == 'mimiciii'):
+def create_database_connection(dbname):
+    if (dbname == MIMIC_III):
         print("we're accessing the MIMIC-III dB")
         try:
             conn = psycopg2.connect(
@@ -84,7 +96,7 @@ def run(dbname):
                 sslmode=os.getenv("DATABASE_SSL_MODE"),
                 options=f'-c search_path=mimiciii,public'
             )
-            cursor = conn.cursor()
+            return conn
         except Exception as error:
             print(error)
     else:
@@ -99,22 +111,45 @@ def run(dbname):
                 sslmode=os.getenv("DATABASE_SSL_MODE"),
                 options=f'-c search_path=eicu_crd,public'
             )
-            cursor = conn.cursor()
+            return conn
         except Exception as error:
             print(error)
-    
-    execute_sql(cursor, path=Path.cwd() / 'sql' / dbname)
-    save_sql(conn, sql_path=Path.cwd() / 'sql' / 'save',
-             save_path=Path.cwd() / 'data' / dbname / 'queried')
+            sys.exit(2)
+
+
+def determine_sql_folder(dbname):
+    if dbname == MIMIC_III:
+        # Notice how the dbname has a different case then the folder name
+        # mimiciii is NOT the same as mimicIII
+        return os.path.join("sql", "mimicIII")
+    elif dbname == EICU:
+        return os.path.join("sql", "eicu")
+    else:
+        return os.path.join("sql", dbname)
+
+
+def run(dbname):
+    # MIMIC
+    conn = create_database_connection(dbname)
+    sql_folder = determine_sql_folder(dbname)
+
+    cursor = conn.cursor()
+    # execute_sql(conn, Path.cwd() / sql_folder)
+
+    save_sql(conn,
+             sql_path=Path.cwd() / 'sql' / 'save',
+             save_path=Path.cwd() / 'data' / dbname / 'queried'
+             )
 
 
 if __name__ == '__main__':
-    dbname_constant = 'eicu'  # in case of no python arguments
-
     load_dotenv()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dbname", type=str, help="choose database name: eicu or mimiciii", choices=[
-                        'eicu', 'mimiciii'])
+    parser.add_argument("--dbname",
+                        type=str,
+                        help="choose database name: eicu or mimiciii",
+                        choices=['eicu', 'mimiciii']
+                        )
     args = parser.parse_args()
 
-    run(dbname=args.dbname) if args.dbname else run(dbname=dbname_constant)
+    run(dbname=args.dbname) if args.dbname else run(dbname=EICU)
