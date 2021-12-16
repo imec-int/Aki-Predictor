@@ -171,7 +171,7 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
 
     with open_preprocessed_to_write(dbname, aki_out_dataset) as f:
         info_save.to_csv(f, encoding='utf-8', header=True)
-        info_save.to_parquet(f, encoding='utf-8', header=True)
+        info_save.to_parquet(f)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
