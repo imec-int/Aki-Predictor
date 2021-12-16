@@ -6,7 +6,6 @@ from pathlib import Path
 
 from util.util import create_insights
 
-
 dbname = 'mimiciii'
 
 
@@ -21,6 +20,10 @@ def open_preprocessed_to_write(dbname:str, filename:str):
     folderpath.mkdir(parents=True, exist_ok=True)
     return open(os.path.join(folderpath, filename), 'w')
 
+def path_to_write(dbname:str, filename:str):
+    folderpath = Path.cwd() / 'data' / dbname / 'preprocessed'
+    folderpath.mkdir(parents=True, exist_ok=True)
+    return os.path.join(folderpath, filename)
 
 def contains_with_hadm(hadm_id, diagnoses):
     """Returns whether diagnoses contains at least one diagnosis with diagnosis['HADM_ID'] == hadm_id ."""
@@ -61,7 +64,7 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
           info_save['COUNTTIMESGOICU'].max())
 
     c_aki_7d = read_queried(dbname, aki_sql_results)
-    
+
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
     print('NORMAL Patients in 7DAY: {}'.format(
         c_aki_7d.loc[c_aki_7d['AKI_STAGE_7DAY'] == 0]['ICUSTAY_ID'].count()))
@@ -94,7 +97,7 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
     renal_diagnoses = diagnoses.loc[diagnoses['RENAL_FAILURE'] == 1]
 
     diagnoses_check = read_queried(dbname, 'DIAGNOSES_ICD.parquet')
-    
+
     check_aki_before_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
         ['5845', '5846', '5847', '5848'])]
     check_CKD_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
@@ -110,36 +113,32 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
 
         eGFR = caculate_eGFR_MDRD_equation(
             cr=cr, gender=gender, age=age, eth=eth)
-
-        df_save.loc[df_save['ICUSTAY_ID'] == int(
-            temp['ICUSTAY_ID'].values[0]), 'EGFR'] = eGFR
-        df_save.loc[df_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'] = c_aki_7d.loc[c_aki_7d['ICUSTAY_ID'] == int(
+        df_corresponds_check = df_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0])
+        df_save.loc[df_corresponds_check, 'EGFR'] = eGFR
+        df_save.loc[df_corresponds_check, 'AKI'] = c_aki_7d.loc[c_aki_7d['ICUSTAY_ID'] == int(
             temp['ICUSTAY_ID'].values[0])]['AKI_7DAY'].values[0]
 
-        if (df_save.loc[df_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
+        if (df_save.loc[df_corresponds_check, 'AKI'].values[0] == 1):
             count_aki = count_aki + 1
         else:
             count_normal = count_normal + 1
 
         if (contains_with_hadm(temp['HADM_ID'], check_CKD_diagnoses) == True):
-            df_save.loc[df_save['ICUSTAY_ID'] == int(
-                temp['ICUSTAY_ID'].values[0]), 'AKI'] = 2
+            df_save.loc[df_corresponds_check, 'AKI'] = 2
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
                 count_ckd_aki = count_ckd_aki + 1
             else:
                 count_ckd_normal = count_ckd_normal + 1
 
         if (contains_with_hadm(temp['HADM_ID'], check_aki_before_diagnoses) == True):
-            df_save.loc[df_save['ICUSTAY_ID'] == int(
-                temp['ICUSTAY_ID'].values[0]), 'AKI'] = 3
+            df_save.loc[df_corresponds_check, 'AKI'] = 3
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
                 count_akibefore_aki = count_akibefore_aki + 1
             else:
                 count_akibefore_normal = count_akibefore_normal + 1
 
         if (contains_with_hadm(temp['HADM_ID'], renal_diagnoses) == True):
-            df_save.loc[df_save['ICUSTAY_ID'] == int(
-                temp['ICUSTAY_ID'].values[0]), 'AKI'] = 4
+            df_save.loc[df_corresponds_check, 'AKI'] = 4
             if (info_save.loc[info_save['ICUSTAY_ID'] == int(temp['ICUSTAY_ID'].values[0]), 'AKI'].values[0] == 1):
                 count_renalfailure_aki = count_renalfailure_aki + 1
             else:
@@ -152,7 +151,7 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
     df_save = pd.merge(info_save, chart, how='left', on='ICUSTAY_ID')
 
     comorbidities = read_queried(dbname, 'comorbidities.parquet')
-    
+
     info_save = pd.merge(df_save, comorbidities, how='left', on='HADM_ID')
     #info_save = info_save.drop(columns=['UNNAMED: 0'])
 
@@ -169,9 +168,10 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset):
     print('normal: {}'.format(count_normal))
     print('aki: {}'.format(count_aki))
 
-    with open_preprocessed_to_write(dbname, aki_out_dataset) as f:
-        info_save.to_csv(f, encoding='utf-8', header=True)
-        info_save.to_parquet(f)
+    # with open_preprocessed_to_write(dbname, aki_out_dataset) as f:
+        # info_save.to_csv(f, encoding='utf-8', header=True)
+    # with path_to_write(dbname, aki_out_dataset) as f:
+    info_save.to_parquet(path_to_write(dbname, aki_out_dataset))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -208,8 +208,8 @@ if __name__ == '__main__':
     c_aki, insights_df = create_insights(
         c_aki, "c_aki_full creatinine infos", insights_df, 'AKI_STAGE')
     #get aki patients 7 days with creatinine and urine
-    get_aki_patients_7days('AKI_KIDIGO_7D_SQL.parquet', 'INFO_DATASET_7days_creatinine+urine2.csv')
+    get_aki_patients_7days('AKI_KIDIGO_7D_SQL.parquet', 'INFO_DATASET_7days_creatinine+urine2.parquet')
     # get aki patients 7 days merged with only creatinine
-    get_aki_patients_7days('AKI_KIDIGO_7D_SQL_CREATININE.parquet','INFO_DATASET_7days_creatinine2.csv')
+    get_aki_patients_7days('AKI_KIDIGO_7D_SQL_CREATININE.parquet','INFO_DATASET_7days_creatinine2.parquet')
 
     # statistical_itemid_missing()
