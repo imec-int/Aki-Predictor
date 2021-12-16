@@ -134,7 +134,7 @@ def run(dbname):
     sql_folder = determine_sql_folder(dbname)
 
     cursor = conn.cursor()
-    # execute_sql(conn, Path.cwd() / sql_folder)
+    execute_sql(conn, Path.cwd() / sql_folder)
 
     save_sql(conn,
              sql_path=Path.cwd() / 'sql' / 'save',
