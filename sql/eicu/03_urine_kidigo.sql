@@ -10,14 +10,14 @@
 -- this assumption may overestimate UO rate when documentation is done less than hourly  
 -- 6 hours  
 DROP MATERIALIZED VIEW IF EXISTS kdigo_uo CASCADE;
-CREATE MATERIALIZED VIEW kdigo_uo  AS with ur_stg as (
+CREATE MATERIALIZED VIEW kdigo_uo AS with ur_stg as (
     select io.patientunitstayid,
         io.chartoffset,
         sum(
             -- we sum for each patientunitstayid over its chartoffset (minutes) and check whether it belongs to output 6hr
             case
                 when io.chartoffset <= iosum.chartoffset + 5 * 60 then iosum.urineoutput
-                else null 
+                else null
             end
         ) as UrineOutput_6hr,
         sum(
@@ -29,80 +29,77 @@ CREATE MATERIALIZED VIEW kdigo_uo  AS with ur_stg as (
         sum(iosum.urineoutput) as UrineOutput_24hr,
         ROUND(
             CAST(
-
-                        io.chartoffset - MIN(
-                                case
-                                    when io.chartoffset <= iosum.chartoffset + 5 * 60 then iosum.chartoffset 
-                                    else null
-                                end
-                             ) 
-                            AS NUMERIC
-                    ),
-                    4
-            ) AS uo_tm_6hr,
-            ROUND(
-                CAST(
+                (
                     io.chartoffset - MIN(
                         case
-                            when io.chartoffset <= iosum.chartoffset + 11 * 60 then iosum.chartoffset
+                            when io.chartoffset <= iosum.chartoffset + 5 * 60 then iosum.chartoffset
                             else null
                         end
-                        )
-                        AS NUMERIC
-                ),
-                4
-            ) AS uo_tm_12hr,
-            ROUND(
-                CAST(
-                    io.chartoffset - MIN(iosum.chartoffset) 
-                        AS NUMERIC
-                ),
-                4
-            ) AS uo_tm_24hr
-            from urineoutput io
-                left join urineoutput iosum on io.patientunitstayid = iosum.patientunitstayid
-                and io.chartoffset >= iosum.chartoffset 
-                and io.chartoffset <= iosum.chartoffset + 23 * 60
-                
-            group by io.patientunitstayid,
-                io.chartoffset
-            -- limit 10000
-        )
-    select ur.patientunitstayid,
-        ur.chartoffset as charttime,
-        wd.starttime,
-        wd.endtime,
-        wd.weight,
-        ur.UrineOutput_6hr,
-        ur.UrineOutput_12hr,
-        ur.UrineOutput_24hr,
-        ROUND(
-            (ur.UrineOutput_6hr / wd.weight /(uo_tm_6hr + 1))::NUMERIC,
+                    )
+                ) / 60.0 AS NUMERIC
+            ),
             4
-        ) AS uo_rt_6hr,
+        ) AS uo_tm_6hr,
         ROUND(
-            (
-                ur.UrineOutput_12hr / wd.weight /(uo_tm_12hr + 1)
-            )::NUMERIC,
-            4
-        ) AS uo_rt_12hr,
-        ROUND(
-            (
-                ur.UrineOutput_24hr / wd.weight /(uo_tm_24hr + 1)
-            )::NUMERIC,
-            4
-        ) AS uo_rt_24hr,
-        uo_tm_6hr,
-        uo_tm_12hr,
-        uo_tm_24hr
-    from ur_stg ur -- 
-        inner join weightdurations wd on ur.patientunitstayid = wd.patientunitstayid --TODO used to be left join, yet we have more urineoutput ids than weight ids...
-        and ur.chartoffset >= wd.starttime 
-        and ur.chartoffset < wd.endtime
-        AND uo_tm_6hr is not NULL
-        and uo_tm_12hr is not NULL
-        and uo_tm_24hr is not NULL
-        and wd.weight is not NULL
-        and wd.weight not in (0)
-    order by patientunitstayid,
-        charttime;
+            CAST(
+                ( io.chartoffset - MIN(
+                    case
+                        when io.chartoffset <= iosum.chartoffset + 11 * 60 then iosum.chartoffset
+                        else null
+                    end
+                )
+            ) / 60.0 AS NUMERIC
+        ),
+        4
+) AS uo_tm_12hr,
+ROUND(
+    CAST(
+        (io.chartoffset - MIN(iosum.chartoffset)) / 60.0 AS NUMERIC
+    ),
+    4
+) AS uo_tm_24hr
+from urineoutput io
+    left join urineoutput iosum on io.patientunitstayid = iosum.patientunitstayid
+    and io.chartoffset >= iosum.chartoffset
+    and io.chartoffset <= iosum.chartoffset + 23 * 60
+group by io.patientunitstayid,
+    io.chartoffset -- limit 10000
+)
+select ur.patientunitstayid,
+    ur.chartoffset as charttime,
+    wd.starttime,
+    wd.endtime,
+    wd.weight,
+    ur.UrineOutput_6hr,
+    ur.UrineOutput_12hr,
+    ur.UrineOutput_24hr,
+    ROUND(
+        (ur.UrineOutput_6hr / wd.weight /(uo_tm_6hr + 1))::NUMERIC,
+        4
+    ) AS uo_rt_6hr,
+    ROUND(
+        (
+            ur.UrineOutput_12hr / wd.weight /(uo_tm_12hr + 1)
+        )::NUMERIC,
+        4
+    ) AS uo_rt_12hr,
+    ROUND(
+        (
+            ur.UrineOutput_24hr / wd.weight /(uo_tm_24hr + 1)
+        )::NUMERIC,
+        4
+    ) AS uo_rt_24hr,
+    uo_tm_6hr,
+    uo_tm_12hr,
+    uo_tm_24hr
+from ur_stg ur -- 
+    inner join weightdurations wd on ur.patientunitstayid = wd.patientunitstayid --TODO used to be left join, yet we have more urineoutput ids than weight ids...
+    and ur.chartoffset >= wd.starttime
+    and ur.chartoffset < wd.endtime
+    AND uo_tm_6hr is not NULL
+    and uo_tm_12hr is not NULL
+    and uo_tm_24hr is not NULL
+    and wd.weight is not NULL
+    and wd.weight not in (0)
+order by patientunitstayid,
+    charttime;
