@@ -104,6 +104,12 @@ SELECT pvt.subject_id,
             ELSE null
         END
     ) as GLUCOSE_max,
+    avg(
+        CASE
+            WHEN label = 'GLUCOSE' THEN valuenum
+            ELSE NULL
+        END
+    ) as GLUCOSE_mean,
     min(
         CASE
             WHEN label = 'HEMATOCRIT' THEN valuenum
