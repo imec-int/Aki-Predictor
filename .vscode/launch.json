@@ -11,6 +11,20 @@
             "program": "${cwd}/aki_preprocess.py",
             "args": ["--dbname", "mimiciii"],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "flwr-server",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/flwr-server.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "flwr-client",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/flwr-client.py",
+            "console": "integratedTerminal"
         }
     ]
 }
