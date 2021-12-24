@@ -139,11 +139,7 @@ def code_gender(gender):
         return 1
 
 
-def cleanup_data(file_path):
-    # read the data from the CSV
-    # df = pd.read_csv(open(file_path, "r"), delimiter=",")
-    df = pd.read_parquet(file_path)
-
+def cleanup_data(df:pd.DataFrame) -> pd.DataFrame:
     df.columns = map(str.upper, df.columns)
     print(df.shape)
     print(df.groupby("AKI")["ICUSTAY_ID"].nunique())
@@ -175,7 +171,6 @@ def cleanup_data(file_path):
 
     df = df.fillna(0)
     # df = df.dropna() #otherwise 
-
 
     # df = df.fillna(df.mean())
 
@@ -231,6 +226,8 @@ def cleanup_data(file_path):
             errors="ignore",
         )
 
+    df = df.replace([np.inf, -np.inf], np.nan).dropna()
+
     return df
 
 
@@ -276,22 +273,11 @@ def compute_metrics(ytest, ypred, runname, output_path, multiclass):
     return disp
 
 
-def aki_model(X, Y, X_test, Y_test, filename, savepath):
-    """
-    function to create and train the model
-    I've added a Tensorboard as an extra callback (in comparison with ExaScience code)
-    """
-    log_dir = Path(
-        savepath / "logs" / filename / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    )
-    callbacks = [
-        tf.keras.callbacks.EarlyStopping(monitor="loss", patience=10),
-        tf.keras.callbacks.TensorBoard(log_dir=log_dir),
-    ]
-
+def create_model(nb_features:int,nb_cats:int) -> tf.keras.Model:
+    """Create, compile and return Keras model."""
     model = tf.keras.models.Sequential(
         [
-            tf.keras.layers.Dense(256, input_dim=X.shape[1], activation="relu"),
+            tf.keras.layers.Dense(256, input_dim=nb_features, activation="relu"),
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(256, activation="relu"),
             tf.keras.layers.Dropout(0.2),
@@ -305,7 +291,7 @@ def aki_model(X, Y, X_test, Y_test, filename, savepath):
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(256, activation="relu"),
             tf.keras.layers.Dropout(0.2),
-            tf.keras.layers.Dense(Y.shape[1], activation=tf.nn.softmax),
+            tf.keras.layers.Dense(nb_cats, activation=tf.nn.softmax),
         ]
     )
 
@@ -314,6 +300,23 @@ def aki_model(X, Y, X_test, Y_test, filename, savepath):
     model.compile(
         loss="categorical_crossentropy", optimizer="adam", metrics=["accuracy"]
     )
+
+    return model
+
+def aki_model(X, Y, X_test, Y_test, filename, savepath):
+    """
+    function to create and train the model
+    I've added a Tensorboard as an extra callback (in comparison with ExaScience code)
+    """
+    model = create_model(X.shape[1], Y.shape[1])
+
+    log_dir = Path(
+        savepath / "logs" / filename / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    )
+    callbacks = [
+        tf.keras.callbacks.EarlyStopping(monitor="loss", patience=10),
+        tf.keras.callbacks.TensorBoard(log_dir=log_dir),
+    ]
 
     model.fit(
         X, Y, epochs=1000, callbacks=callbacks, verbose="auto", use_multiprocessing=True
@@ -374,12 +377,6 @@ def run_aki_model(df, filename, dbname):
     """
     in run aki model, we'll prepare the dataset to feed it to an ML model, after which we fit the model and save all metrics
     """
-    # filename is the name of the output file, as we'll link a model to its generated features.
-    # we'll add the time of execution in the filename, as to have an easy identifier
-    filename = "{}_{}".format(
-        filename, datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    )
-    savepath = Path(Path.cwd() / "data" / dbname / "model")
     # first we'll normalize all the data
     df_norm = normalize_df(df)
     # Then we'll randomnly split the dataset in training and testing sets, with accompanying labels
@@ -394,6 +391,13 @@ def run_aki_model(df, filename, dbname):
             test.shape, to_categorical(test_label).shape
         )
     )
+    
+    # filename is the name of the output file, as we'll link a model to its generated features.
+    # we'll add the time of execution in the filename, as to have an easy identifier
+    filename = "{}_{}".format(
+        filename, datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    )
+    savepath = Path(Path.cwd() / "data" / dbname / "model")
 
     # We create and train the model
     Y_pred_train, Y_pred_test = aki_model(
@@ -583,11 +587,6 @@ def change_data_size(df):
     split_randomly(df, 0.90, "90% test size")
     split_randomly(df, 0.95, "95% test size")
 
-
-def build_preprocess_file_path(dbname, file_name):
-    return Path(Path.cwd() / "data" / dbname / "preprocessed" / file_name)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -600,14 +599,12 @@ if __name__ == "__main__":
     dbname = "eicu"  # default
     if args.dbname:
         dbname = args.dbname
-
-    preprocessed_file_path = partial(build_preprocess_file_path, dbname)
     
-    # df = cleanup_data(preprocessed_file_path("INFO_DATASET_7days_creatinine2.csv"))
-    df = cleanup_data(preprocessed_file_path("INFO_DATASET_7days_creatinine2.parquet"))
+    input_data_path = Path.cwd() / "data" / dbname / "preprocessed"
 
-    df = df.replace([np.inf, -np.inf], np.nan).dropna()
-
+    # df = pd.read_csv(open(file_path, "r"), delimiter=",")
+    df = pd.read_parquet(input_data_path / "INFO_DATASET_7days_creatinine2.parquet")
+    df = cleanup_data(df)
     df = df[
         [
             "AKI",
@@ -692,14 +689,11 @@ if __name__ == "__main__":
             "RENAL_FAILURE",
         ]
     ]
-    # INFO_DATASET_7days_creatinine+urine_withcomorbidities.csv
-    df2 = cleanup_data(
-        preprocessed_file_path("INFO_DATASET_7days_creatinine+urine2.parquet")
-    )
-    # df2 = cleanup_data(preprocessed_file_path("INFO_DATASET_7days_creatinine+urine2.csv"))
 
-    df2 = df2.replace([np.inf, -np.inf], np.nan).dropna()
+    run_aki_model(df, "creatinine_model", dbname)
 
+    df2 = pd.read_parquet(input_data_path / "INFO_DATASET_7days_creatinine+urine2.parquet")
+    df2 = cleanup_data(df2)
     df2 = df2[
         [
             "AKI",
@@ -788,7 +782,6 @@ if __name__ == "__main__":
         ]
     ]
 
-    run_aki_model(df, "creatinine_model", dbname)
     run_aki_model(df2, "creatinine_urine_model", dbname)
 
     # cluster_ethnicity(df)

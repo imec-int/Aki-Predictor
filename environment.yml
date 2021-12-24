@@ -18,5 +18,6 @@ dependencies:
   - scikit-learn==1.0.1
   - matplotlib==3.4.3
   - pip
+  - flwr
   - pip:
     - tensorflow==2.7

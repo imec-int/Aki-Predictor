@@ -1,0 +1,33 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "AKI_sql",
+      "type": "python",
+      "request": "launch",
+      "program": "aki-postgres.py",
+      "justMyCode": false,
+      "args": ["--dbname","eicu"]
+    },
+    {
+      "name": "AKI_preprocess",
+      "type": "python",
+      "request": "launch",
+      "program": "aki_preprocess.py",
+      "justMyCode": false,
+      "args": ["--dbname","mimiciii"]
+      // "args": ["-W","error"]
+    },
+    {
+      "name": "AKI_ml",
+      "type": "python",
+      "request": "launch",
+      "program": "aki_ml.py",
+      "justMyCode": false,
+      "args": ["--dbname","mimiciii"]
+    }
+  ]
+}
