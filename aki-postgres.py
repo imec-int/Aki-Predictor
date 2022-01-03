@@ -1,26 +1,24 @@
 import argparse
 import os
 import sys
-from pathlib import Path
 
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
-MIMIC_III = 'mimiciii'
-EICU = 'eicu'
+from config import config, MIMIC_III, EICU
 
 
 def test_postgres(cursor):
     cursor.execute("""
-SELECT
-    *
-FROM
-   pg_catalog.pg_tables
-WHERE
-   schemaname != 'pg_catalog'
-AND schemaname != 'information_schema';
+    SELECT
+        *
+    FROM
+    pg_catalog.pg_tables
+    WHERE
+    schemaname != 'pg_catalog'
+    AND schemaname != 'information_schema';
     """)
 
     tables = cursor.fetchall()
@@ -57,35 +55,8 @@ AND schemaname != 'information_schema';
         print(df.head())
 
 
-def execute_sql(conn, path):
-    print('Executing SQL files')
-
-    for i in sorted(os.listdir(path)):
-        cur = conn.cursor()
-        try:
-            print("accessing file: " + i)
-            sql_file = open(os.path.join(path, i), 'r')
-            cur.execute(sql_file.read())
-            conn.commit()
-        finally:
-            cur.close()
-
-
-def save_sql(conn, sql_path, save_path):
-    save_path.mkdir(parents=True, exist_ok=True)
-    for i in sorted(os.listdir(sql_path)):
-        # we split on the dot, the second part is the name of the file to save, the first part is the order of execution, last is extension
-        filename = i.split(".")[1]
-        print("accessing save file: " + filename)
-        sql_file = open(os.path.join(sql_path, i), 'r')
-        df = pd.read_sql_query(sql_file.read(), conn)
-        # df.to_csv(os.path.join(save_path, filename+".csv"),
-        #           encoding='utf-8', header=True)
-        df.to_parquet(path=os.path.join(save_path, filename + ".parquet"))
-
-
-def create_database_connection(dbname):
-    if (dbname == MIMIC_III):
+def create_database_connection(cfg):
+    if (cfg.dbmodel == MIMIC_III):
         print("we're accessing the MIMIC-III dB")
         try:
             conn = psycopg2.connect(
@@ -99,15 +70,17 @@ def create_database_connection(dbname):
             return conn
         except Exception as error:
             print(error)
-    else:
-        # eICU
+    else: # eICU
         print("we're accessing the eICU dB")
+        dbname = cfg.dbname
+        if cfg.dbname == "":
+            dbname = os.getenv("DATABASE_NAME_EICU")
         try:
             conn = psycopg2.connect(
                 host=os.getenv("DATABASE_HOST_EICU"),
                 user=os.getenv("DATABASE_USER_EICU"),
                 password=os.getenv("DATABASE_PASSWORD_EICU"),
-                database=os.getenv("DATABASE_NAME_EICU"),
+                database=dbname,
                 sslmode=os.getenv("DATABASE_SSL_MODE"),
                 options=f'-c search_path=eicu_crd,public'
             )
@@ -117,39 +90,52 @@ def create_database_connection(dbname):
             sys.exit(2)
 
 
-def determine_sql_folder(dbname):
-    if dbname == MIMIC_III:
-        # Notice how the dbname has a different case then the folder name
-        # mimiciii is NOT the same as mimicIII
-        return os.path.join("sql", "mimicIII")
-    elif dbname == EICU:
-        return os.path.join("sql", "eicu")
-    else:
-        return os.path.join("sql", dbname)
+def execute_sql(conn, path):
+    for i in sorted(os.listdir(path)):
+        cur = conn.cursor()
+        try:
+            sql_file = open(os.path.join(path, i), 'r')
+            print("executing sql file: " + i)
+            cur.execute(sql_file.read())
+            conn.commit()
+        finally:
+            cur.close()
 
 
-def run(dbname):
-    # MIMIC
-    conn = create_database_connection(dbname)
-    sql_folder = determine_sql_folder(dbname)
-
-    cursor = conn.cursor()
-    execute_sql(conn, Path.cwd() / sql_folder)
-
-    save_sql(conn,
-             sql_path=Path.cwd() / 'sql' / 'save',
-             save_path=Path.cwd() / 'data' / dbname / 'queried'
-             )
+def save_sql(conn, sql_path, output_path):
+    output_path.mkdir(parents=True, exist_ok=True)
+    for i in sorted(os.listdir(sql_path)):
+        # we split on the dot, the second part is the name of the file to save, the first part is the order of execution, last is extension
+        filename = i.split(".")[1]
+        sql_file = open(os.path.join(sql_path, i), 'r')
+        df = pd.read_sql_query(sql_file.read(), conn)
+        # df.to_csv(os.path.join(save_path, filename+".csv"),
+        #           encoding='utf-8', header=True)
+        print("saving {} rows to {}: ".format(df.shape[0], filename))
+        df.to_parquet(path=os.path.join(output_path, filename + ".parquet"))
 
 
 if __name__ == '__main__':
     load_dotenv()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dbname",
+    parser.add_argument("--dbmodel",
                         type=str,
-                        help="choose database name: eicu or mimiciii",
+                        help="choose database model: eicu (default) or mimiciii",
                         choices=['eicu', 'mimiciii']
                         )
-    args = parser.parse_args()
+    parser.add_argument("--dbname",
+                        type=str,
+                        help="choose database",
+                        )
 
-    run(dbname=args.dbname) if args.dbname else run(dbname=EICU)
+    cfg = config(parser.parse_args())
+
+    conn = create_database_connection(cfg)
+
+    cursor = conn.cursor()
+    execute_sql(conn, cfg.sql_path())
+
+    save_sql(conn,
+             sql_path=cfg.save_sql_path(),
+             output_path=cfg.queried_path(),
+             )

@@ -20,8 +20,8 @@ We also included co-morbidities such as congestive heart failure,  hypertension,
 3. Fill in the values.
 4. Set the environment variables using: `. .env`
 5. Execute one of the following commands to extract AKI patient data from the MIMIC III or eICU databases:
-   - `python aki-postgres.py --dbname mimiciii`
-   - `python aki-postgres.py --dbname eicu`
+   - `python aki-postgres.py --dbmodel mimiciii`
+   - `python aki-postgres.py --dbmodel eicu`
    
    This will generate parquet files of all responses in [data/queried](./data/queried)
 
@@ -29,11 +29,11 @@ We also included co-morbidities such as congestive heart failure,  hypertension,
 [jupyter notebook](data_exploration.ipynb).)
 
 6. Execute one of the following commands to clean and preprocess the csv files generated from the data extraction step:
-   - `python aki_preprocess.py --dbname mimiciii`
-   - `python aki_preprocess.py --dbname eicu`
+   - `python aki_preprocess.py --dbmodel mimiciii`
+   - `python aki_preprocess.py --dbmodel eicu`
 7. To run the machine learning model run according to the database:
--  `python aki_ml.py --dbname mimiciii`
--  `python aki_ml.py --dbname eicu`
+-  `python aki_ml.py --dbmodel mimiciii`
+-  `python aki_ml.py --dbmodel eicu`
 
 
 The aki_ml.py script contain the following functions:

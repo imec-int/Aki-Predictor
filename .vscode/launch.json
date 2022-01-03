@@ -9,7 +9,15 @@
             "type": "python",
             "request": "launch",
             "program": "${cwd}/aki_preprocess.py",
-            "args": ["--dbname", "mimiciii"],
+            "args": ["--dbmodel", "mimiciii"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "preprocess eicu",
+            "type": "python",
+            "request": "launch",
+            "program": "${cwd}/aki_preprocess.py",
+            "args": ["--dbmodel", "eicu", "--dbname", "hospital_73"],
             "console": "integratedTerminal"
         },
         {
