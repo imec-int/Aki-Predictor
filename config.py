@@ -43,17 +43,14 @@ class config:
     def preprocessed_path(self) -> Path:
         return self._data_path() / 'preprocessed'
 
-    def model_path(self) -> Path:
-        return self._data_path() / 'model'
-
     def logs_path(self) -> Path:
-        return self.model_path() / 'logs' / self.runname
+        return self._data_path() / 'model' / self.runname / 'logs'
 
     def weights_path(self) -> Path:
-        return self.model_path() / 'weights' / '{}.weights'.format(self.runname)
+        return self._data_path() / 'model' / self.runname / 'weights' / 'model.weights'
 
     def metrics_path(self) -> Path:
-        return self.model_path() / "metrics"
+        return self._data_path() / 'model' / self.runname / 'metrics'
 
     def copy(self):
         return deepcopy(self)
