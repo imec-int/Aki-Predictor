@@ -26,8 +26,8 @@ SELECT pvt.subject_id,
     min(SpO2) as SpO2_Min,
     max(SpO2) as SpO2_Max,
     avg(SpO2) as SpO2_Mean,
-    NULL as Glucose_Min, --TODO glucose
-    NULL as Glucose_Max --TODO glucose
+    -- NULL as Glucose_Min, --TODO glucose
+    -- NULL as Glucose_Max --TODO glucose
     -- NULL as Glucose_Mean --TODO glucose
 FROM (
          
