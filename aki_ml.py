@@ -569,9 +569,9 @@ if __name__ == "__main__":
     cfg = config(parser.parse_args())
 
     cfg_creat = cfg.copy()
-    cfg_creat.runname = "creatinine_model_" + cfg.now.strftime("%Y%m%d-%H%M%S")
+    cfg_creat.runname = "creatinine_model_" + cfg_creat.now.strftime("%Y%m%d-%H%M%S")
     # df = pd.read_csv(open(file_path, "r"), delimiter=",")
-    df = pd.read_parquet(cfg.preprocessed_path() / "INFO_DATASET_7days_creatinine2.parquet")
+    df = pd.read_parquet(cfg_creat.preprocessed_path() / "INFO_DATASET_7days_creatinine2.parquet")
     df = cleanup_data(df)
     df = df[
         [
@@ -657,11 +657,11 @@ if __name__ == "__main__":
             "RENAL_FAILURE",
         ]
     ]
-    run_aki_model(cfg, df)
+    run_aki_model(cfg_creat, df)
 
     cfg_urine = cfg.copy()
-    cfg_urine.runname = "creatinine_urine_model_" + cfg.now.strftime("%Y%m%d-%H%M%S")
-    df2 = pd.read_parquet(cfg.preprocessed_path() / "INFO_DATASET_7days_creatinine+urine2.parquet")
+    cfg_urine.runname = "creatinine_urine_model_" + cfg_urine.now.strftime("%Y%m%d-%H%M%S")
+    df2 = pd.read_parquet(cfg_urine.preprocessed_path() / "INFO_DATASET_7days_creatinine+urine2.parquet")
     df2 = cleanup_data(df2)
     df2 = df2[
         [
@@ -750,7 +750,7 @@ if __name__ == "__main__":
             "RENAL_FAILURE",
         ]
     ]
-    run_aki_model(cfg, df2)
+    run_aki_model(cfg_urine, df2)
 
     # cluster_ethnicity(cfg, df)
     # cluster_ethnicity(cfg, df2)
