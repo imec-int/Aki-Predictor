@@ -32,10 +32,10 @@ class config:
         return Path.cwd() / 'sql' / 'save'
 
     def _data_path(self) -> Path:
-        if self.dbname == "":
-            return Path.cwd() / 'data' / self.dbmodel
-        else:
+        if self.dbname:
             return Path.cwd() / 'data' / self.dbmodel / self.dbname
+        else:
+            return Path.cwd() / 'data' / self.dbmodel
 
     def queried_path(self) -> Path:
         return self._data_path() / 'queried'

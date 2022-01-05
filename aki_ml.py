@@ -254,7 +254,7 @@ def compute_metrics(cfg, ytest, ypred, multiclass):
     metrics_dict["Accuracy score"] = accuracy_score(ytest, ypred).tolist()
     with open(runfile, "w") as f:
         json.dump(metrics_dict, f)
-    return disp
+    return disp, metrics_dict
 
 
 def create_model(nb_features:int,nb_cats:int) -> tf.keras.Model:
@@ -299,9 +299,7 @@ def aki_model(cfg, X, Y, X_test, Y_test):
         tf.keras.callbacks.TensorBoard(log_dir=cfg.logs_path()),
     ]
 
-    model.fit(
-        X, Y, epochs=1000, callbacks=callbacks, verbose="auto", use_multiprocessing=True
-    )
+    model.fit(X, Y, epochs=1000, callbacks=callbacks, verbose="auto", use_multiprocessing=True)
 
     model.save_weights(cfg.weights_path())
 
@@ -361,16 +359,8 @@ def run_aki_model(cfg, df):
     df_norm = normalize_df(df)
     # Then we'll randomnly split the dataset in training and testing sets, with accompanying labels
     train, train_label, test, test_label = create_datasets(df=df_norm, split=0.2)
-    print(
-        "training examples: {} ,label: {}".format(
-            train.shape, to_categorical(train_label).shape
-        )
-    )
-    print(
-        "test examples: {}, label: {}".format(
-            test.shape, to_categorical(test_label).shape
-        )
-    )
+    print("training examples: {} ,label: {}".format(train.shape, to_categorical(train_label).shape))
+    print("test examples: {}, label: {}".format(test.shape, to_categorical(test_label).shape))
 
     # We create and train the model
     Y_pred_train, Y_pred_test = aki_model(

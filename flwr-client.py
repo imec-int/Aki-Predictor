@@ -1,12 +1,14 @@
 import flwr as fl
 import argparse
 import pandas as pd
-import datetime
 import tensorflow as tf
+import numpy as np
 
 from pathlib import Path
 
-from aki_ml import create_model, cleanup_data, normalize_df, create_datasets, to_categorical
+from tensorflow.keras import callbacks
+
+from aki_ml import create_model, cleanup_data, normalize_df, create_datasets, to_categorical, compute_metrics
 from config import config
 
 class FlwrClient(fl.client.NumPyClient):
@@ -19,7 +21,7 @@ class FlwrClient(fl.client.NumPyClient):
         self.model = create_model(self.x_train.shape[1], self.y_train.shape[1])
 
     def get_data(self):
-        input_pth = self.config.input_path() / self.input_filename
+        input_pth = self.config.preprocessed_path() / self.input_filename
         df = pd.DataFrame()
         if input_pth.suffix == ".csv":
             df = pd.read_csv(input_pth)
@@ -31,23 +33,45 @@ class FlwrClient(fl.client.NumPyClient):
         df = normalize_df(df)
         train, train_label, test, test_label = create_datasets(df, split=0.2)
 
+        self.test_label = test_label
+
         return train, to_categorical(train_label), test, to_categorical(test_label) # x_train, y_train, x_test, y_test
 
     def get_parameters(self):
         return self.model.get_weights()
 
-    def fit(self, parameters, config):
+    def fit(self, parameters, fit_config):
         self.model.set_weights(parameters)
-        self.model.fit(self.x_train, self.y_train, epochs=1, batch_size=32, steps_per_epoch=3, callbacks=[
+
+        callbacks = [
             tf.keras.callbacks.EarlyStopping(monitor="loss", patience=10),
-            tf.keras.callbacks.TensorBoard(log_dir=self.config.log_path()),
-        ])
+            tf.keras.callbacks.TensorBoard(log_dir=self.config.logs_path() / "round_{}".format(fit_config["round"])),
+        ]
+
+        #self.model.fit(self.x_train, self.y_train, epochs=1, batch_size=32, steps_per_epoch=3, callbacks=callbacks)
+        self.model.fit(self.x_train, self.y_train, epochs=50, callbacks=callbacks, verbose="auto", use_multiprocessing=True)
+        
+        self.model.save_weights(cfg.weights_path())
+        
         return self.model.get_weights(), len(self.x_train), {}
 
     def evaluate(self, parameters, config):
         self.model.set_weights(parameters)
+
+        metrics = dict()
+
         loss, accuracy = self.model.evaluate(self.x_test, self.y_test)
-        return loss, len(self.x_test), {"accuracy": accuracy}
+        metrics["accuracy"] = accuracy
+
+        y_pred_test = np.argmax(self.model.predict(self.x_test), axis=-1)
+        _, computed_metrics = compute_metrics(self.config, self.test_label, y_pred_test, multiclass=True)
+        # flat_dict["classification_report"] = metrics["classification_report"] cannot be marshalled to protobuf
+        # flat_dict["confusion_matrix"] = metrics["confusion_matrix"] cannot be marshalled to protobuf
+        metrics["accuracy confusion matrix"] = computed_metrics["accuracy confusion matrix"]
+        metrics["Area Under ROC"] = computed_metrics["Area Under ROC"]
+        metrics["Accuracy score"] = computed_metrics["Accuracy score"]
+
+        return loss, len(self.x_test), metrics
 
 
 creat_df_columns = [
@@ -231,6 +255,7 @@ if __name__ == "__main__":
                         help="choose database",
                         )
 
-    cfg = config(parser.parse_args(), "creatinine_model")
+    cfg = config(parser.parse_args())
+    cfg.runname = "flwr_creatinine_model_" + cfg.now.strftime("%Y%m%d-%H%M%S")
 
-    fl.client.start_numpy_client(server_address="[::]:8080", client=FlwrClient(config, "INFO_DATASET_7days_creatinine2.csv", creat_df_columns))
+    fl.client.start_numpy_client(server_address="[::]:8080", client=FlwrClient(cfg, "INFO_DATASET_7days_creatinine2.parquet", creat_df_columns))
