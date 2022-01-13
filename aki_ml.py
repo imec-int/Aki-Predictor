@@ -315,11 +315,11 @@ def aki_model(X, Y, X_test, Y_test, filename, savepath):
     )
     callbacks = [
         tf.keras.callbacks.EarlyStopping(monitor="loss", patience=10),
-        tf.keras.callbacks.TensorBoard(log_dir=log_dir),
+        tf.keras.callbacks.TensorBoard(log_dir=log_dir,histogram_freq=1),
     ]
 
     model.fit(
-        X, Y, epochs=1000, callbacks=callbacks, verbose="auto", use_multiprocessing=True
+        X, Y, epochs=1000, callbacks=callbacks, verbose="auto", use_multiprocessing=True, validation_data=(X_test, Y_test)
     )
 
     weights_path = Path(savepath / "weights" / "{}.weights".format(filename))
