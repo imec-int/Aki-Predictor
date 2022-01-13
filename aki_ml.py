@@ -1,38 +1,20 @@
-import time
-import csv
-from functools import partial
-
 import numpy as np
-
-import os
 
 import tensorflow as tf
 
 import pandas as pd
 import argparse
 
-import random
-
-from sklearn.neural_network import MLPClassifier
-from sklearn import preprocessing
-from sklearn import metrics
-
+from sklearn import preprocessing, metrics
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.preprocessing import normalize
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import classification_report
 
-from keras.models import Sequential
-from keras.layers import Dense, Dropout
-from keras import layers
-from keras import activations
-
 from sklearn.model_selection import train_test_split
 
 from keras.utils.vis_utils import plot_model
-
-from keras.layers import Activation
 
 # from keras.utils import to_categorical #prior version of TF
 from tensorflow.keras.utils import to_categorical  # TF2.7
@@ -41,6 +23,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import datetime
 import json
+
+from config import config
 
 scaler = preprocessing.StandardScaler()
 # scaler = preprocessing.MinMaxScaler()
@@ -237,8 +221,8 @@ def accuracy_confusion(confusion_matrix):
     return diagonal_sum / sum_of_all_elements
 
 
-def compute_metrics(ytest, ypred, runname, output_path, multiclass):
-    runfile = Path(output_path / "metrics" / "{}.json".format(runname))
+def compute_metrics(cfg, ytest, ypred, multiclass):
+    runfile = cfg.metrics_path() / "{}.json".format(cfg.runname)
 
     if multiclass == True:
         lb = preprocessing.LabelBinarizer()
@@ -257,8 +241,8 @@ def compute_metrics(ytest, ypred, runname, output_path, multiclass):
 
     disp = ConfusionMatrixDisplay(confusion_matrix=C)
     disp.plot()  # you need to call this function, otherwise the plot is not being generated and we can't save it
-    Path(output_path / "metrics").mkdir(parents=True, exist_ok=True)
-    plt.savefig(Path(output_path / "metrics" / "{}.png".format(runname)))
+    cfg.metrics_path().mkdir(parents=True, exist_ok=True)
+    plt.savefig(cfg.metrics_path() / "{}.png".format(cfg.runname))
 
     # normed_C = normalize(C, axis=1, norm='l1')
 
@@ -270,7 +254,7 @@ def compute_metrics(ytest, ypred, runname, output_path, multiclass):
     metrics_dict["Accuracy score"] = accuracy_score(ytest, ypred).tolist()
     with open(runfile, "w") as f:
         json.dump(metrics_dict, f)
-    return disp
+    return disp, metrics_dict
 
 
 def create_model(nb_features:int,nb_cats:int) -> tf.keras.Model:
@@ -303,16 +287,13 @@ def create_model(nb_features:int,nb_cats:int) -> tf.keras.Model:
 
     return model
 
-def aki_model(X, Y, X_test, Y_test, filename, savepath):
+def aki_model(cfg, X, Y, X_test, Y_test):
     """
     function to create and train the model
     I've added a Tensorboard as an extra callback (in comparison with ExaScience code)
     """
     model = create_model(X.shape[1], Y.shape[1])
 
-    log_dir = Path(
-        savepath / "logs" / filename / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    )
     callbacks = [
         tf.keras.callbacks.EarlyStopping(monitor="loss", patience=10),
         tf.keras.callbacks.TensorBoard(log_dir=log_dir,histogram_freq=1),
@@ -322,8 +303,8 @@ def aki_model(X, Y, X_test, Y_test, filename, savepath):
         X, Y, epochs=1000, callbacks=callbacks, verbose="auto", use_multiprocessing=True, validation_data=(X_test, Y_test)
     )
 
-    weights_path = Path(savepath / "weights" / "{}.weights".format(filename))
-    model.save_weights(weights_path)
+
+    model.save_weights(cfg.weights_path())
 
     y_pred_test = np.argmax(model.predict(X_test), axis=-1)
     y_pred_train = np.argmax(model.predict(X), axis=-1)
@@ -373,7 +354,7 @@ def create_datasets(df, split: float):
     return train, label_train, test, label_test
 
 
-def run_aki_model(df, filename, dbname):
+def run_aki_model(cfg, df):
     """
     in run aki model, we'll prepare the dataset to feed it to an ML model, after which we fit the model and save all metrics
     """
@@ -381,38 +362,22 @@ def run_aki_model(df, filename, dbname):
     df_norm = normalize_df(df)
     # Then we'll randomnly split the dataset in training and testing sets, with accompanying labels
     train, train_label, test, test_label = create_datasets(df=df_norm, split=0.2)
-    print(
-        "training examples: {} ,label: {}".format(
-            train.shape, to_categorical(train_label).shape
-        )
-    )
-    print(
-        "test examples: {}, label: {}".format(
-            test.shape, to_categorical(test_label).shape
-        )
-    )
-    
-    # filename is the name of the output file, as we'll link a model to its generated features.
-    # we'll add the time of execution in the filename, as to have an easy identifier
-    filename = "{}_{}".format(
-        filename, datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    )
-    savepath = Path(Path.cwd() / "data" / dbname / "model")
+    print("training examples: {} ,label: {}".format(train.shape, to_categorical(train_label).shape))
+    print("test examples: {}, label: {}".format(test.shape, to_categorical(test_label).shape))
 
     # We create and train the model
     Y_pred_train, Y_pred_test = aki_model(
+        cfg,
         train,
         to_categorical(train_label),
         test,
         to_categorical(test_label),
-        filename=filename,
-        savepath=savepath,
     )
     # we'll compute the metrics and save them for later comparison
-    compute_metrics(test_label, Y_pred_test, filename, savepath, multiclass=True)
+    compute_metrics(cfg, test_label, Y_pred_test, multiclass=True)
 
 
-def cluster_ethnicity(df):
+def cluster_ethnicity(cfg, df):
     print("start ethinicty clustering")
 
     caucasian = df.loc[df["ETHNICITY"] == 0]
@@ -445,13 +410,9 @@ def cluster_ethnicity(df):
     print("Y_caucasian", np.unique(Y_caucasian, return_counts=True))
     print("Y_african", np.unique(Y_african, return_counts=True))
     print("Y_hispanic", np.unique(Y_hispanic, return_counts=True))
-    print(
-        "Y_others_non_caucasian", np.unique(Y_others_non_caucasian, return_counts=True)
-    )
+    print("Y_others_non_caucasian", np.unique(Y_others_non_caucasian, return_counts=True))
 
-    print(
-        "Train on TRAIN caucasian set + test on TEST caucasian set + test on all african set"
-    )
+    print("Train on TRAIN caucasian set + test on TEST caucasian set + test on all african set")
 
     caucasian_train, caucasian_test = create_datasets(caucasian, 0.2)
     #  make_train_test(
@@ -543,15 +504,13 @@ def cluster_ethnicity(df):
     Y_african_test_pred = model.predict_classes(X_african_test)
     Y_hispanic_test_pred = model.predict_classes(X_hispanic_test)
 
-    compute_metrics(Y_caucasian_test, Y_caucasian_test_pred, multiclass=True)
-    compute_metrics(
-        Y_others_non_caucasian, Y_others_non_caucasian_pred, multiclass=True
-    )
-    compute_metrics(Y_african_test, Y_african_test_pred, multiclass=True)
-    compute_metrics(Y_hispanic_test, Y_hispanic_test_pred, multiclass=True)
+    compute_metrics(cfg, Y_caucasian_test, Y_caucasian_test_pred, 'caucasian_test', multiclass=True)
+    compute_metrics(cfg, Y_others_non_caucasian, Y_others_non_caucasian_pred, 'others_non_caucasian', multiclass=True)
+    compute_metrics(cfg, Y_african_test, Y_african_test_pred, 'african_test', multiclass=True)
+    compute_metrics(cfg, Y_hispanic_test, Y_hispanic_test_pred, 'hispanic_test', multiclass=True)
 
 
-def split_randomly(df, ratio, str):
+def split_randomly(cfg, df, ratio, str):
     scaler.fit(df.iloc[:, 2:])
 
     df.iloc[:, 2:] = scaler.transform(df.iloc[:, 2:])
@@ -567,43 +526,45 @@ def split_randomly(df, ratio, str):
     Y_test = df_test["AKI_STAGE_7DAY"]
 
     Y_pred_train, Y_pred_test = aki_model(
+        cfg,
         X_train, to_categorical(Y_train), X_test, to_categorical(Y_test), str
     )
 
-    compute_metrics(Y_test, Y_pred_test, multiclass=True)
+    compute_metrics(cfg, Y_test, Y_pred_test, 'random-split', multiclass=True)
 
 
-def change_data_size(df):
+def change_data_size(cfg, df):
     print("random subsampling")
 
-    split_randomly(df, 0.02, "2% test size")
-    split_randomly(df, 0.05, "5% test size")
-    split_randomly(df, 0.10, "10% test size")
-    split_randomly(df, 0.20, "20% test size")
-    split_randomly(df, 0.40, "40% test size")
-    split_randomly(df, 0.50, "50% test size")
-    split_randomly(df, 0.60, "60% test size")
-    split_randomly(df, 0.80, "80% test size")
-    split_randomly(df, 0.90, "90% test size")
-    split_randomly(df, 0.95, "95% test size")
+    split_randomly(cfg, df, 0.02, "2% test size")
+    split_randomly(cfg, df, 0.05, "5% test size")
+    split_randomly(cfg, df, 0.10, "10% test size")
+    split_randomly(cfg, df, 0.20, "20% test size")
+    split_randomly(cfg, df, 0.40, "40% test size")
+    split_randomly(cfg, df, 0.50, "50% test size")
+    split_randomly(cfg, df, 0.60, "60% test size")
+    split_randomly(cfg, df, 0.80, "80% test size")
+    split_randomly(cfg, df, 0.90, "90% test size")
+    split_randomly(cfg, df, 0.95, "95% test size")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dbname",
-        type=str,
-        help="choose database name: eicu or mimiciii",
-        choices=["eicu", "mimiciii"],
-    )
-    args = parser.parse_args()
-    dbname = "eicu"  # default
-    if args.dbname:
-        dbname = args.dbname
-    
-    input_data_path = Path.cwd() / "data" / dbname / "preprocessed"
+    parser.add_argument("--dbmodel",
+                        type=str,
+                        help="choose database model: eicu (default) or mimiciii",
+                        choices=['eicu', 'mimiciii']
+                        )
+    parser.add_argument("--dbname",
+                        type=str,
+                        help="choose database",
+                        )
 
+    cfg = config(parser.parse_args())
+
+    cfg_creat = cfg.copy()
+    cfg_creat.runname = "creatinine_model_" + cfg_creat.now.strftime("%Y%m%d-%H%M%S")
     # df = pd.read_csv(open(file_path, "r"), delimiter=",")
-    df = pd.read_parquet(input_data_path / "INFO_DATASET_7days_creatinine2.parquet")
+    df = pd.read_parquet(cfg_creat.preprocessed_path() / "INFO_DATASET_7days_creatinine2.parquet")
     df = cleanup_data(df)
     df = df[
         [
@@ -689,10 +650,11 @@ if __name__ == "__main__":
             "RENAL_FAILURE",
         ]
     ]
+    run_aki_model(cfg_creat, df)
 
-    run_aki_model(df, "creatinine_model", dbname)
-
-    df2 = pd.read_parquet(input_data_path / "INFO_DATASET_7days_creatinine+urine2.parquet")
+    cfg_urine = cfg.copy()
+    cfg_urine.runname = "creatinine_urine_model_" + cfg_urine.now.strftime("%Y%m%d-%H%M%S")
+    df2 = pd.read_parquet(cfg_urine.preprocessed_path() / "INFO_DATASET_7days_creatinine+urine2.parquet")
     df2 = cleanup_data(df2)
     df2 = df2[
         [
@@ -781,11 +743,10 @@ if __name__ == "__main__":
             "RENAL_FAILURE",
         ]
     ]
+    run_aki_model(cfg_urine, df2)
 
-    run_aki_model(df2, "creatinine_urine_model", dbname)
+    # cluster_ethnicity(cfg, df)
+    # cluster_ethnicity(cfg, df2)
 
-    # cluster_ethnicity(df)
-    # cluster_ethnicity(df2)
-
-    # change_data_size(df)
-    # change_data_size(df2)
+    # change_data_size(cfg, df)
+    # change_data_size(cfg, df2)

@@ -7,24 +7,13 @@ from pathlib import Path
 
 from util.util import create_insights
 
-dbname = 'mimiciii'
+from config import config
 
 
-def read_queried(dbname:str, filename:str):
-    df = pd.read_parquet(os.path.join('.', 'data', dbname, 'queried', filename))
+def read_queried(cfg:config, filename:str):
+    df = pd.read_parquet(cfg.queried_path() / filename)
     df.columns = map(str.upper, df.columns)
     return df
-
-
-def open_preprocessed_to_write(dbname:str, filename:str):
-    folderpath = Path.cwd() / 'data' / dbname / 'preprocessed'
-    folderpath.mkdir(parents=True, exist_ok=True)
-    return open(os.path.join(folderpath, filename), 'w')
-
-def path_to_write(dbname:str, filename:str):
-    folderpath = Path.cwd() / 'data' / dbname / 'preprocessed'
-    folderpath.mkdir(parents=True, exist_ok=True)
-    return os.path.join(folderpath, filename)
 
 def contains_with_hadm(hadm_id, diagnoses):
     """Returns whether diagnoses contains at least one diagnosis with diagnosis['HADM_ID'] == hadm_id ."""
@@ -43,12 +32,12 @@ def caculate_eGFR_MDRD_equation(cr, gender, eth, age):
         temp = temp * 1.21
     return temp
 
-def get_aki_patients_7days(aki_sql_results, aki_out_dataset, debugprint: bool):
+def get_aki_patients_7days(cfg:config,aki_sql_results, aki_out_dataset, debugprint: bool):
     '''
     get_aki_patients_7days: this function preprocceses the <aki_sql_results> dataset in order to create a more expanded view on the data.
     <aki_out_dataset> is the file in which we'll write the output
     '''
-    df = read_queried(dbname, 'ADMISSIONS.parquet')
+    df = read_queried(cfg, 'ADMISSIONS.parquet')
     df = df.sort_values(by=['SUBJECT_ID', 'HADM_ID', 'ICUSTAY_ID'])
     
 
@@ -64,7 +53,7 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset, debugprint: bool):
         print("the biggest number of ICU stays for a patient: ",
           info_save['COUNTTIMESGOICU'].max())
 
-    c_aki_7d = read_queried(dbname, aki_sql_results)
+    c_aki_7d = read_queried(cfg, aki_sql_results)
     if(debugprint):
         print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
         print('NORMAL Patients in 7DAY: {}'.format(
@@ -95,10 +84,10 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset, debugprint: bool):
         count_renalfailure_normal = 0
         count_renalfailure_aki = 0
 
-    diagnoses = read_queried(dbname, 'comorbidities.parquet')
+    diagnoses = read_queried(cfg, 'comorbidities.parquet')
     renal_diagnoses = diagnoses.loc[diagnoses['RENAL_FAILURE'] == 1]
 
-    diagnoses_check = read_queried(dbname, 'DIAGNOSES_ICD.parquet')
+    diagnoses_check = read_queried(cfg, 'DIAGNOSES_ICD.parquet')
 
     check_aki_before_diagnoses = diagnoses_check.loc[diagnoses_check['ICD9_CODE'].isin(
         ['5845', '5846', '5847', '5848'])]
@@ -147,13 +136,13 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset, debugprint: bool):
                 else:
                     count_renalfailure_normal = count_renalfailure_normal + 1
 
-    lab = read_queried(dbname, 'labstay.parquet')
+    lab = read_queried(cfg, 'labstay.parquet')
     info_save = pd.merge(df_save, lab, how='left', on='ICUSTAY_ID')
 
-    chart = read_queried(dbname, 'chart_vitals_stay.parquet')
+    chart = read_queried(cfg, 'chart_vitals_stay.parquet')
     df_save = pd.merge(info_save, chart, how='left', on='ICUSTAY_ID')
 
-    comorbidities = read_queried(dbname, 'comorbidities.parquet')
+    comorbidities = read_queried(cfg, 'comorbidities.parquet')
 
     info_save = pd.merge(df_save, comorbidities, how='left', on='HADM_ID')
     #info_save = info_save.drop(columns=['UNNAMED: 0'])
@@ -171,48 +160,54 @@ def get_aki_patients_7days(aki_sql_results, aki_out_dataset, debugprint: bool):
         print('normal: {}'.format(count_normal))
         print('aki: {}'.format(count_aki))
 
-    # with open_preprocessed_to_write(dbname, aki_out_dataset) as f:
-        # info_save.to_csv(f, encoding='utf-8', header=True)
-    # with path_to_write(dbname, aki_out_dataset) as f:
-    info_save.to_parquet(path_to_write(dbname, aki_out_dataset))
+    
+    folderpath = cfg.preprocessed_path()
+    folderpath.mkdir(parents=True, exist_ok=True)
+    info_save.to_parquet(folderpath / aki_out_dataset)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dbname", type=str, help="choose database name: eicu or mimiciii", choices=[
-                        'eicu', 'mimiciii'])
-    args = parser.parse_args()
-    dbname = 'eicu' # default
-    if args.dbname:
-        dbname = args.dbname
+    parser.add_argument("--dbmodel",
+                        type=str,
+                        help="choose database model: eicu (default) or mimiciii",
+                        choices=['eicu', 'mimiciii']
+                        )
+    parser.add_argument("--dbname",
+                        type=str,
+                        help="choose database",
+                        )
+
+    cfg = config(parser.parse_args())
+    
 
     cols_insights = ["total ICUstays", "No AKI Observations", "AKI STAGE 1 observations",
                      "AKI STAGE 2 observations", "AKI STAGE 3 observations", "NaN AKI observations"]
     insights_df = pd.DataFrame(index=cols_insights)
 
-    c_aki = read_queried(dbname, 'AKI_KIDIGO_STAGES_SQL.parquet')
+    c_aki = read_queried(cfg, 'AKI_KIDIGO_STAGES_SQL.parquet')
     c_aki, insights_df = create_insights(
         c_aki, "c_aki_full", insights_df, 'AKI_STAGE')
 
-    c_aki_7d = read_queried(dbname, 'AKI_KIDIGO_7D_SQL.parquet')
+    c_aki_7d = read_queried(cfg, 'AKI_KIDIGO_7D_SQL.parquet')
     c_aki_7d, insights_df = create_insights(
         c_aki_7d, "c_aki_7d_full", insights_df, 'AKI_STAGE_7DAY')
     c_aki_7d = c_aki_7d.dropna(subset=['AKI_STAGE_7DAY'])
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
 
     print("USING ONLY CREATININE")
-    c_aki_7d = read_queried(dbname, 'AKI_KIDIGO_7D_SQL_CREATININE.parquet')
+    c_aki_7d = read_queried(cfg, 'AKI_KIDIGO_7D_SQL_CREATININE.parquet')
     c_aki_7d, insights_df = create_insights(
         c_aki_7d, "c_aki_7d creat_only", insights_df, 'AKI_STAGE_7DAY')
 
     #c_aki_7d = c_aki_7d.loc[c_aki_7d['AKI_STAGE_7DAY'].isin(['0', '1'])]
     print("Total icustays: ", c_aki_7d['ICUSTAY_ID'].nunique())
 
-    c_aki = read_queried(dbname, 'AKI_KIDIGO_STAGES_SQL_CREATININE.parquet')
+    c_aki = read_queried(cfg, 'AKI_KIDIGO_STAGES_SQL_CREATININE.parquet')
     c_aki, insights_df = create_insights(
         c_aki, "c_aki_full creatinine infos", insights_df, 'AKI_STAGE')
     #get aki patients 7 days with creatinine and urine
-    get_aki_patients_7days('AKI_KIDIGO_7D_SQL.parquet', 'INFO_DATASET_7days_creatinine+urine2.parquet', debugprint=False)
+    get_aki_patients_7days(cfg, 'AKI_KIDIGO_7D_SQL.parquet', 'INFO_DATASET_7days_creatinine+urine2.parquet', debugprint=False)
     # get aki patients 7 days merged with only creatinine
-    get_aki_patients_7days('AKI_KIDIGO_7D_SQL_CREATININE.parquet','INFO_DATASET_7days_creatinine2.parquet', debugprint=False)
+    get_aki_patients_7days(cfg, 'AKI_KIDIGO_7D_SQL_CREATININE.parquet','INFO_DATASET_7days_creatinine2.parquet', debugprint=False)
 
     # statistical_itemid_missing()

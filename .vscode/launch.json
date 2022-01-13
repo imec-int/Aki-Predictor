@@ -5,12 +5,43 @@
   "version": "0.2.0",
   "configurations": [
     {
+        "name": "preprocess mimiciii",
+        "type": "python",
+        "request": "launch",
+        "program": "${cwd}/aki_preprocess.py",
+        "args": ["--dbmodel", "mimiciii"],
+        "console": "integratedTerminal"
+    },
+    {
+        "name": "preprocess eicu",
+        "type": "python",
+        "request": "launch",
+        "program": "${cwd}/aki_preprocess.py",
+        "args": ["--dbmodel", "eicu", "--dbname", "hospital_73"],
+        "console": "integratedTerminal"
+    },
+    {
+        "name": "flwr-server",
+        "type": "python",
+        "request": "launch",
+        "program": "${cwd}/flwr-server.py",
+        "console": "integratedTerminal"
+    },
+    {
+        "name": "flwr-client",
+        "type": "python",
+        "request": "launch",
+        "program": "${cwd}/flwr-client.py",
+        "args": ["--dbmodel", "eicu", "--dbname", "hospital_73"],
+        "console": "integratedTerminal"
+    },
+    {
       "name": "AKI_sql",
       "type": "python",
       "request": "launch",
       "program": "aki-postgres.py",
       "justMyCode": false,
-      "args": ["--dbname","eicu"]
+      "args": ["--dbmodel","eicu"]
     },
     {
       "name": "AKI_preprocess",
@@ -18,7 +49,7 @@
       "request": "launch",
       "program": "aki_preprocess.py",
       "justMyCode": false,
-      "args": ["--dbname","mimiciii"]
+      "args": ["--dbmodel","mimiciii"]
       // "args": ["-W","error"]
     },
     {
@@ -27,7 +58,7 @@
       "request": "launch",
       "program": "aki_ml.py",
       "justMyCode": false,
-      "args": ["--dbname","mimiciii"]
+      "args": ["--dbmodel","mimiciii"]
     }
   ]
 }
