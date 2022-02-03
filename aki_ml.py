@@ -18,11 +18,13 @@ from keras.utils.vis_utils import plot_model
 
 # from keras.utils import to_categorical #prior version of TF
 from tensorflow.keras.utils import to_categorical  # TF2.7
+from tensorflow import keras
 
 from pathlib import Path
 import matplotlib.pyplot as plt
 import datetime
 import json
+from csv import writer
 
 from config import config
 
@@ -123,25 +125,25 @@ def code_gender(gender):
         return 1
 
 
-def cleanup_data(df:pd.DataFrame) -> pd.DataFrame:
+def cleanup_data(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = map(str.upper, df.columns)
     print(df.shape)
-    print(df.groupby("AKI")["ICUSTAY_ID"].nunique())
-    print(df.groupby("AKI_STAGE_7DAY")["ICUSTAY_ID"].nunique())
+    # print(df.groupby("AKI")["ICUSTAY_ID"].nunique())
+    # print(df.groupby("AKI_STAGE_7DAY")["ICUSTAY_ID"].nunique())
 
     # exclude CKD and AKI on admission patients
     df = df[~(df["AKI"] == 2)]
     df = df[~(df["AKI"] == 3)]
     df = df[~(df["AKI"] == 4)]
 
-    print(df.groupby("AKI")["ICUSTAY_ID"].nunique())
+    # print(df.groupby("AKI")["ICUSTAY_ID"].nunique())
 
     # Consider only adults
     df = df[~(df["AGE"] < 18)]
     df["ETHNICITY"] = df["ETHNICITY"].apply(lambda x: code_ethnicity(x))
     df["GENDER"] = df["GENDER"].apply(lambda x: code_gender(x))
 
-    print(df.groupby("ETHNICITY")["ICUSTAY_ID"].nunique())
+    # print(df.groupby("ETHNICITY")["ICUSTAY_ID"].nunique())
 
     df = df.rename(
         columns={
@@ -154,7 +156,7 @@ def cleanup_data(df:pd.DataFrame) -> pd.DataFrame:
     )
 
     df = df.fillna(0)
-    # df = df.dropna() #otherwise 
+    # df = df.dropna() #otherwise
 
     # df = df.fillna(df.mean())
 
@@ -162,7 +164,7 @@ def cleanup_data(df:pd.DataFrame) -> pd.DataFrame:
 
     df = df.drop(df.columns[1], axis=1)
 
-    print("cleanup1", df.columns)
+    # print("cleanup1", df.columns)
 
     if "AKI_7DAY" in df.columns:
         # ,  'SUBJECT_ID_x','GLUCOSE_MIN_y', 'GLUCOSE_MAX_y'
@@ -221,6 +223,33 @@ def accuracy_confusion(confusion_matrix):
     return diagonal_sum / sum_of_all_elements
 
 
+def compute_AUROC(cfg, hospital_name, ytest, ypred,  multiclass):
+    runfile = cfg.metrics_path() / "{}_auroc_comparison.csv".format(cfg.runname)
+
+    if multiclass == True:
+        lb = preprocessing.LabelBinarizer()
+        lb.fit(ytest)
+        ytest = lb.transform(ytest)
+        ypred = lb.transform(ypred)
+        class_rep = classification_report(ytest, ypred, output_dict=True)
+        C = confusion_matrix(ytest.argmax(axis=1), ypred.argmax(axis=1))
+    else:
+        class_rep = classification_report(ytest, ypred, output_dict=True)
+        C = confusion_matrix(ytest, ypred)
+    cfg.metrics_path().mkdir(parents=True, exist_ok=True)
+    auroc = metrics.roc_auc_score(
+        ytest, ypred).tolist()
+    auroc_set = [cfg.dbname, hospital_name, auroc]
+
+    print(auroc_set)
+    with open(runfile, "a", newline='') as f:
+        writer_object = writer(f)
+        writer_object.writerow(auroc_set)
+        f.close()
+    return auroc
+    # return disp, metrics_dict
+
+
 def compute_metrics(cfg, ytest, ypred, multiclass):
     runfile = cfg.metrics_path() / "{}.json".format(cfg.runname)
 
@@ -229,6 +258,7 @@ def compute_metrics(cfg, ytest, ypred, multiclass):
         lb.fit(ytest)
         ytest = lb.transform(ytest)
         ypred = lb.transform(ypred)
+        print(ytest.shape, ypred.shape)
         class_rep = classification_report(ytest, ypred, output_dict=True)
         # save_dict(runfile=runfile, classification_report=class_rep)
         print(class_rep)  # , labels=[0, 1, 2, 3]))
@@ -244,24 +274,24 @@ def compute_metrics(cfg, ytest, ypred, multiclass):
     cfg.metrics_path().mkdir(parents=True, exist_ok=True)
     plt.savefig(cfg.metrics_path() / "{}.png".format(cfg.runname))
 
-    # normed_C = normalize(C, axis=1, norm='l1')
-
     metrics_dict = dict()
     metrics_dict["classification_report"] = class_rep
     metrics_dict["confusion_matrix"] = C.tolist()
     metrics_dict["accuracy confusion matrix"] = accuracy_confusion(C).tolist()
-    metrics_dict["Area Under ROC"] = metrics.roc_auc_score(ytest, ypred).tolist()
+    metrics_dict["Area Under ROC"] = metrics.roc_auc_score(
+        ytest, ypred).tolist()
     metrics_dict["Accuracy score"] = accuracy_score(ytest, ypred).tolist()
     with open(runfile, "w") as f:
         json.dump(metrics_dict, f)
     return disp, metrics_dict
 
 
-def create_model(nb_features:int,nb_cats:int) -> tf.keras.Model:
+def create_model(nb_features: int, nb_cats: int) -> tf.keras.Model:
     """Create, compile and return Keras model."""
     model = tf.keras.models.Sequential(
         [
-            tf.keras.layers.Dense(256, input_dim=nb_features, activation="relu"),
+            tf.keras.layers.Dense(
+                256, input_dim=nb_features, activation="relu"),
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(256, activation="relu"),
             tf.keras.layers.Dropout(0.2),
@@ -287,46 +317,33 @@ def create_model(nb_features:int,nb_cats:int) -> tf.keras.Model:
 
     return model
 
+
 def aki_model(cfg, X, Y, X_test, Y_test):
     """
     function to create and train the model
     I've added a Tensorboard as an extra callback (in comparison with ExaScience code)
     """
     model = create_model(X.shape[1], Y.shape[1])
-
+    print(X.shape[1], Y.shape[1])
     callbacks = [
         tf.keras.callbacks.EarlyStopping(monitor="loss", patience=10),
-        tf.keras.callbacks.TensorBoard(log_dir=log_dir,histogram_freq=1),
+        tf.keras.callbacks.TensorBoard(
+            log_dir=cfg.logs_path(), histogram_freq=1),
     ]
 
     model.fit(
         X, Y, epochs=1000, callbacks=callbacks, verbose="auto", use_multiprocessing=True, validation_data=(X_test, Y_test)
     )
 
-
+    # save model into the TensorFlow SavedModel format
+    model.save(cfg.saved_model_path())
+    # save model weights
     model.save_weights(cfg.weights_path())
 
     y_pred_test = np.argmax(model.predict(X_test), axis=-1)
     y_pred_train = np.argmax(model.predict(X), axis=-1)
 
     return y_pred_train, y_pred_test
-
-
-# def make_train_test(df, ntest, seed=None):
-
-#     if ntest < 1:
-#         ntest = df.shape[0] * ntest
-#     if seed is not None:
-#         np.random.seed(seed)
-
-#     ntest = int(round(ntest))
-#     rperm = np.random.permutation(df.shape[0])
-#     train = rperm[ntest:]
-#     test = rperm[0:ntest]
-#     dftrain = df.iloc[train]
-#     dftest = df.iloc[test]
-
-#     return dftrain, dftest
 
 
 def normalize_df(df):
@@ -347,33 +364,41 @@ def create_datasets(df, split: float):
     """
     # drop the AKI column as it's not needed
     dataframe = df.drop(["AKI"], axis=1)
-    train, test = train_test_split(dataframe, test_size=split, train_size=1 - split)
-    # Parameter `AKI_STAGE_7DAY` is the label which we want to predict with our model, so we remove it from the dataset
-    label_train = train.pop("AKI_STAGE_7DAY")
-    label_test = test.pop("AKI_STAGE_7DAY")
+    labels = (dataframe.pop("AKI_STAGE_7DAY"))
+    print(labels)
+    print(labels.value_counts())
+    train, test, label_train, label_test = train_test_split(
+        dataframe, labels, test_size=split, train_size=1 - split, stratify=labels)
+    print(label_train.value_counts())
+    print(label_test.value_counts())
+
     return train, label_train, test, label_test
 
 
-def run_aki_model(cfg, df):
+def run_aki_model(cfg, df, split=0.2):
     """
     in run aki model, we'll prepare the dataset to feed it to an ML model, after which we fit the model and save all metrics
     """
     # first we'll normalize all the data
     df_norm = normalize_df(df)
     # Then we'll randomnly split the dataset in training and testing sets, with accompanying labels
-    train, train_label, test, test_label = create_datasets(df=df_norm, split=0.2)
-    print("training examples: {} ,label: {}".format(train.shape, to_categorical(train_label).shape))
-    print("test examples: {}, label: {}".format(test.shape, to_categorical(test_label).shape))
+    train, train_label, test, test_label = create_datasets(
+        df=df_norm, split=split)
+    print("training examples: {} ,label: {}".format(
+        train.shape, to_categorical(train_label, num_classes=4).shape))
+    print("test examples: {}, label: {}".format(
+        test.shape, to_categorical(test_label, num_classes=4).shape))
 
     # We create and train the model
     Y_pred_train, Y_pred_test = aki_model(
         cfg,
         train,
-        to_categorical(train_label),
+        to_categorical(train_label, num_classes=4),
         test,
-        to_categorical(test_label),
+        to_categorical(test_label, num_classes=4),
     )
     # we'll compute the metrics and save them for later comparison
+    # print("classifier {}\r\n {}".format(test_label.shape,test_label))
     compute_metrics(cfg, test_label, Y_pred_test, multiclass=True)
 
 
@@ -410,7 +435,8 @@ def cluster_ethnicity(cfg, df):
     print("Y_caucasian", np.unique(Y_caucasian, return_counts=True))
     print("Y_african", np.unique(Y_african, return_counts=True))
     print("Y_hispanic", np.unique(Y_hispanic, return_counts=True))
-    print("Y_others_non_caucasian", np.unique(Y_others_non_caucasian, return_counts=True))
+    print("Y_others_non_caucasian", np.unique(
+        Y_others_non_caucasian, return_counts=True))
 
     print("Train on TRAIN caucasian set + test on TEST caucasian set + test on all african set")
 
@@ -480,7 +506,8 @@ def cluster_ethnicity(cfg, df):
             tf.keras.layers.Dense(256, activation="relu"),
             tf.keras.layers.Dropout(0.2),
             tf.keras.layers.Dense(
-                to_categorical(Y_caucasian_train).shape[1], activation=tf.nn.softmax
+                to_categorical(
+                    Y_caucasian_train).shape[1], activation=tf.nn.softmax
             ),
         ]
     )
@@ -504,10 +531,14 @@ def cluster_ethnicity(cfg, df):
     Y_african_test_pred = model.predict_classes(X_african_test)
     Y_hispanic_test_pred = model.predict_classes(X_hispanic_test)
 
-    compute_metrics(cfg, Y_caucasian_test, Y_caucasian_test_pred, 'caucasian_test', multiclass=True)
-    compute_metrics(cfg, Y_others_non_caucasian, Y_others_non_caucasian_pred, 'others_non_caucasian', multiclass=True)
-    compute_metrics(cfg, Y_african_test, Y_african_test_pred, 'african_test', multiclass=True)
-    compute_metrics(cfg, Y_hispanic_test, Y_hispanic_test_pred, 'hispanic_test', multiclass=True)
+    compute_metrics(cfg, Y_caucasian_test, Y_caucasian_test_pred,
+                    'caucasian_test', multiclass=True)
+    compute_metrics(cfg, Y_others_non_caucasian, Y_others_non_caucasian_pred,
+                    'others_non_caucasian', multiclass=True)
+    compute_metrics(cfg, Y_african_test, Y_african_test_pred,
+                    'african_test', multiclass=True)
+    compute_metrics(cfg, Y_hispanic_test, Y_hispanic_test_pred,
+                    'hispanic_test', multiclass=True)
 
 
 def split_randomly(cfg, df, ratio, str):
@@ -547,116 +578,20 @@ def change_data_size(cfg, df):
     split_randomly(cfg, df, 0.90, "90% test size")
     split_randomly(cfg, df, 0.95, "95% test size")
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dbmodel",
-                        type=str,
-                        help="choose database model: eicu (default) or mimiciii",
-                        choices=['eicu', 'mimiciii']
-                        )
-    parser.add_argument("--dbname",
-                        type=str,
-                        help="choose database",
-                        )
 
-    cfg = config(parser.parse_args())
-
-    cfg_creat = cfg.copy()
-    cfg_creat.runname = "creatinine_model_" + cfg_creat.now.strftime("%Y%m%d-%H%M%S")
-    # df = pd.read_csv(open(file_path, "r"), delimiter=",")
-    df = pd.read_parquet(cfg_creat.preprocessed_path() / "INFO_DATASET_7days_creatinine2.parquet")
+def clean_data_creat_ur(cfg, logfile=None):
+    cfg_urine = cfg.copy()
+    cfg_urine.runname = "creatinine_urine_model_" + \
+        cfg_urine.dbname
+    # cfg_urine.now.strftime("%Y%m%d-%H%M%S") #attention removed the timestamping to later easilier gather results
+    try:
+        df = pd.read_parquet(cfg_urine.preprocessed_path() /
+                             "INFO_DATASET_7days_creatinine+urine2.parquet")
+    except FileNotFoundError as err:
+        print("file not found error: {0}".format(err))
+        return
     df = cleanup_data(df)
     df = df[
-        [
-            "AKI",
-            "AKI_STAGE_7DAY",
-            "CREATININE_MAX",
-            "CREATININE_MIN",
-            "CREAT",
-            "EGFR",
-            "POTASSIUM_MAX",
-            "GLUCOSE_MAX",
-            "PLATELET_MIN",
-            "BUN_MAX",
-            "WBC_MIN",
-            "PLATELET_MAX",
-            "TEMPC_MEAN",
-            "GLUCOSE_MEAN",
-            "PTT_MAX",
-            "TEMPC_MIN",
-            "BUN_MIN",
-            "HEMATOCRIT_MIN",
-            "SPO2_MEAN",
-            "MEANBP_MEAN",
-            "AGE",
-            "HEARTRATE_MEAN",
-            "PT_MAX",
-            "TEMPC_MAX",
-            "RESPRATE_MEAN",
-            "CHLORIDE_MAX",
-            "GLUCOSE_MIN",
-            "WBC_MAX",
-            "DIASBP_MEAN",
-            "SYSBP_MAX",
-            "DIASBP_MIN",
-            "CHLORIDE_MIN",
-            "SPO2_MIN",
-            "HEARTRATE_MAX",
-            "HEMOGLOBIN_MAX",
-            "SYSBP_MEAN",
-            "HEMATOCRIT_MAX",
-            "DIASBP_MAX",
-            "HEARTRATE_MIN",
-            "SYSBP_MIN",
-            "SODIUM_MIN",
-            "MEANBP_MAX",
-            "BICARBONATE_MAX",
-            "MEANBP_MIN",
-            "SODIUM_MAX",
-            "ANIONGAP_MAX",
-            "ANIONGAP_MIN",
-            "HEMOGLOBIN_MIN",
-            "LACTATE_MIN",
-            "BICARBONATE_MIN",
-            "PTT_MIN",
-            "PT_MIN",
-            "BILIRUBIN_MAX",
-            "RESPRATE_MIN",
-            "LACTATE_MAX",
-            "RESPRATE_MAX",
-            "ALBUMIN_MIN",
-            "POTASSIUM_MIN",
-            "INR_MAX",
-            "ALBUMIN_MAX",
-            "BILIRUBIN_MIN",
-            "INR_MIN",
-            "BANDS_MIN",
-            "ETHNICITY",
-            "BANDS_MAX",
-            "HYPERTENSION",
-            "DIABETES_UNCOMPLICATED",
-            "VALVULAR_DISEASE",
-            "CONGESTIVE_HEART_FAILURE",
-            "SPO2_MAX",
-            "ALCOHOL_ABUSE",
-            "GENDER",
-            "CARDIAC_ARRHYTHMIAS",
-            "PERIPHERAL_VASCULAR",
-            "OBESITY",
-            "HYPOTHYROIDISM",
-            "DIABETES_COMPLICATED",
-            "LIVER_DISEASE",
-            "DRUG_ABUSE",
-            "RENAL_FAILURE",
-        ]
-    ]
-    run_aki_model(cfg_creat, df)
-
-    cfg_urine = cfg.copy()
-    cfg_urine.runname = "creatinine_urine_model_" + cfg_urine.now.strftime("%Y%m%d-%H%M%S")
-    df2 = pd.read_parquet(cfg_urine.preprocessed_path() / "INFO_DATASET_7days_creatinine+urine2.parquet")
-    df2 = cleanup_data(df2)
-    df2 = df2[
         [
             "AKI",
             "AKI_STAGE_7DAY",
@@ -743,7 +678,178 @@ if __name__ == "__main__":
             "RENAL_FAILURE",
         ]
     ]
-    run_aki_model(cfg_urine, df2)
+    # create dir if not existing yet
+    Path(cfg_urine.cleaned_data_path()).mkdir(parents=True, exist_ok=True)
+    # we'll save the cleaned dataframe so it's easier to validate the metrics afterwards
+    df.to_parquet(cfg_urine.cleaned_data_path() /
+                  "INFO_DATASET_7days_creatinine+urine2.parquet")
+    export_patient_insights(df, "creat+urine", logfile)
+
+    return cfg_urine
+
+
+def clean_data_creat_only(cfg, logfile=None):
+    cfg_creat = cfg.copy()
+    cfg_creat.runname = "creatinine_model_" + \
+        cfg_creat.dbname
+    # cfg_creat.now.strftime("%Y%m%d-%H%M%S") #attention removed the timestamping to later easilier gather results
+    # df = pd.read_csv(open(file_path, "r"), delimiter=",")
+    try:
+        df = pd.read_parquet(cfg_creat.preprocessed_path() /
+                             "INFO_DATASET_7days_creatinine2.parquet")
+    except FileNotFoundError as err:
+        print("file not found error: {0}".format(err))
+        return
+    df = cleanup_data(df)
+    df = df[
+        [
+            "AKI",
+            "AKI_STAGE_7DAY",
+            "CREATININE_MAX",
+            "CREATININE_MIN",
+            "CREAT",
+            "EGFR",
+            "POTASSIUM_MAX",
+            "GLUCOSE_MAX",
+            "PLATELET_MIN",
+            "BUN_MAX",
+            "WBC_MIN",
+            "PLATELET_MAX",
+            "TEMPC_MEAN",
+            "GLUCOSE_MEAN",
+            "PTT_MAX",
+            "TEMPC_MIN",
+            "BUN_MIN",
+            "HEMATOCRIT_MIN",
+            "SPO2_MEAN",
+            "MEANBP_MEAN",
+            "AGE",
+            "HEARTRATE_MEAN",
+            "PT_MAX",
+            "TEMPC_MAX",
+            "RESPRATE_MEAN",
+            "CHLORIDE_MAX",
+            "GLUCOSE_MIN",
+            "WBC_MAX",
+            "DIASBP_MEAN",
+            "SYSBP_MAX",
+            "DIASBP_MIN",
+            "CHLORIDE_MIN",
+            "SPO2_MIN",
+            "HEARTRATE_MAX",
+            "HEMOGLOBIN_MAX",
+            "SYSBP_MEAN",
+            "HEMATOCRIT_MAX",
+            "DIASBP_MAX",
+            "HEARTRATE_MIN",
+            "SYSBP_MIN",
+            "SODIUM_MIN",
+            "MEANBP_MAX",
+            "BICARBONATE_MAX",
+            "MEANBP_MIN",
+            "SODIUM_MAX",
+            "ANIONGAP_MAX",
+            "ANIONGAP_MIN",
+            "HEMOGLOBIN_MIN",
+            "LACTATE_MIN",
+            "BICARBONATE_MIN",
+            "PTT_MIN",
+            "PT_MIN",
+            "BILIRUBIN_MAX",
+            "RESPRATE_MIN",
+            "LACTATE_MAX",
+            "RESPRATE_MAX",
+            "ALBUMIN_MIN",
+            "POTASSIUM_MIN",
+            "INR_MAX",
+            "ALBUMIN_MAX",
+            "BILIRUBIN_MIN",
+            "INR_MIN",
+            "BANDS_MIN",
+            "ETHNICITY",
+            "BANDS_MAX",
+            "HYPERTENSION",
+            "DIABETES_UNCOMPLICATED",
+            "VALVULAR_DISEASE",
+            "CONGESTIVE_HEART_FAILURE",
+            "SPO2_MAX",
+            "ALCOHOL_ABUSE",
+            "GENDER",
+            "CARDIAC_ARRHYTHMIAS",
+            "PERIPHERAL_VASCULAR",
+            "OBESITY",
+            "HYPOTHYROIDISM",
+            "DIABETES_COMPLICATED",
+            "LIVER_DISEASE",
+            "DRUG_ABUSE",
+            "RENAL_FAILURE",
+        ]
+    ]
+    # create dir if not existing yet
+    Path(cfg_creat.cleaned_data_path()).mkdir(parents=True, exist_ok=True)
+    # we'll save the cleaned dataframe so it's easier to validate the metrics afterwards
+    df.to_parquet(cfg_creat.cleaned_data_path() /
+                  "INFO_DATASET_7days_creatinine2.parquet")
+    # TODO export insights from here!
+    export_patient_insights(df, "creat", logfile)
+    # run_aki_model(cfg_creat, df)
+    return cfg_creat
+
+
+def export_patient_insights(df, label, logfile):
+    print("{}:Total icustays:{}".format(
+        label, df['AKI_STAGE_7DAY'].nunique()), file=logfile)
+    print("{}:NORMAL Patients in 7DAY:{}".format(label,
+                                                 df.loc[df['AKI_STAGE_7DAY'] == 0]['AKI_STAGE_7DAY'].count()), file=logfile)
+    print("{}:AKI patients STAGE 1 within 7DAY:{}".format(label,
+                                                          df.loc[df['AKI_STAGE_7DAY'] == 1]['AKI_STAGE_7DAY'].count()), file=logfile)
+    print("{}:AKI Patients STAGE 2 in 7DAY:{}".format(label,
+                                                      df.loc[df['AKI_STAGE_7DAY'] == 2]['AKI_STAGE_7DAY'].count()), file=logfile)
+    print("{}:AKI Patients STAGE 3 7DAY:{}".format(label,
+                                                   df.loc[df['AKI_STAGE_7DAY'] == 3]['AKI_STAGE_7DAY'].count()), file=logfile)
+    print("{}:NAN patients within 7DAY:{}".format(label,
+                                                  df['AKI_STAGE_7DAY'].isna().sum()), file=logfile)
+
+
+def validate_model(model_cfg, val_cfg):
+    model_cfg.runname = "creatinine_model_" + \
+        model_cfg.dbname
+    model = keras.models.load_model(model_cfg.saved_model_path())
+    # todo validate model on dataset and return metrics (AUROC only?)
+    dataset = pd.read_parquet(
+        val_cfg.cleaned_data_path() / "INFO_DATASET_7days_creatinine2.parquet")
+    data = dataset.drop(["AKI"], axis=1)
+    label = data.pop("AKI_STAGE_7DAY")
+    df_norm = normalize_df(data)
+    print(df_norm.shape)
+    prediction = np.argmax(model.predict(df_norm), axis=-1)
+    # we'll compute the metrics and save them for later comparison
+    auroc = compute_AUROC(model_cfg, val_cfg.dbname, to_categorical(label), prediction,
+                          multiclass=True)
+    return auroc
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dbmodel",
+                        type=str,
+                        help="choose database model: eicu (default) or mimiciii",
+                        choices=['eicu', 'mimiciii']
+                        )
+    parser.add_argument("--dbname",
+                        type=str,
+                        help="choose database",
+                        )
+
+    cfg = config(parser.parse_args())
+
+    cfg_creat = clean_data_creat_only(cfg)
+    run_aki_model(cfg_creat, pd.read_parquet(cfg_creat.cleaned_data_path() /
+                  "INFO_DATASET_7days_creatinine2.parquet"))
+
+    cfg_urine = clean_data_creat_ur(cfg)
+    run_aki_model(cfg_urine, pd.read_parquet(cfg_urine.cleaned_data_path() /
+                  "INFO_DATASET_7days_creatinine+urine2.parquet"))
 
     # cluster_ethnicity(cfg, df)
     # cluster_ethnicity(cfg, df2)
