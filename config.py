@@ -43,8 +43,14 @@ class config:
     def preprocessed_path(self) -> Path:
         return self._data_path() / 'preprocessed'
 
+    def cleaned_data_path(self) -> Path:
+        return self._data_path() / 'clean_data'
+
     def logs_path(self) -> Path:
         return self._data_path() / 'model' / self.runname / 'logs'
+
+    def saved_model_path(self) -> Path:
+        return self._data_path() / 'model' / self.runname / 'saved_model'
 
     def weights_path(self) -> Path:
         return self._data_path() / 'model' / self.runname / 'weights' / 'model.weights'
