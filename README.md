@@ -42,6 +42,15 @@ The aki_ml.py script contain the following functions:
 * cluster_ethnicity: subsets the data  by  ethnicity:  train  on  "Caucasian"  (all variants),  predict  for  all  other  ethnicities.   
 * change_data_size: does random subsampling of available training data
 
+## global vs local mode
+
+use `-m local` for processing all local hospitals or `-m global` for the global model
+- `python launch_flow.py -q -m [local/global]` for querying the local/global database => outcome?
+- `python launch_flow.py -pp -m [local/global]` for preprocessing the local/global database => outcome?
+- `python launch_flow.py -i -m [local/global]` for generating the insights csv
+- `python launch_flow.py -ml -m [local/global]` for training the ML model => outcome?
+- `python launch_flow.py -v -m [local/global]` for validating the local/global model on all databases => outcome?
+
 ## AKI-ML output
 
 We'll output some files, depending on the timestamp and the database being accessed. This allows for easier comparison between different runs as well as different datasets.
