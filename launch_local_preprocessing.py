@@ -414,7 +414,7 @@ class local_flow():
         fig.write_html(Path(Path.cwd() / 'data' /
                             'eicu' / 'auroc_local_matrix.html'))
 
-    def validate_global_model(self):
+    def validate_global_model(self, name):
         val_args = fakeArgsClass()
         # we'll iterate over the hospitals of which we've trained a model
         train_file = pd.read_csv(Path(
@@ -422,7 +422,7 @@ class local_flow():
         self.train_ids = train_file.loc[train_file['train_bool']
                                         == True]['hospital_id'].tolist()
         auroc_df = pd.DataFrame(index=self.train_ids)
-        self.args.dbname = "eicu"
+        # self.args.dbname = "eicu"
         print("validating {}".format(self.args.dbname))
         # cfg is the config containing the link to the model
         model_cfg = config(
@@ -437,11 +437,33 @@ class local_flow():
             auroc_list.append(aki_ml.validate_model(model_cfg, val_cfg))
         auroc_df[self.args.dbname] = auroc_list
         auroc_df.to_csv(Path(Path.cwd() / 'data' /
-                        'eicu' / 'auroc_global_matrix.csv'))
+                        'eicu' / 'auroc_{}_matrix.csv'.format(name)))
         fig = px.imshow(auroc_df)
         fig.show()
         fig.write_html(Path(Path.cwd() / 'data' /
-                            'eicu' / 'auroc_global_matrix.html'))
+                            'eicu' / 'auroc_{}_matrix.html'.format(name)))
+
+    def combine_datasets(self):
+        '''
+        this function combines the cleaned datasets, forming one big dataset which can be used for stratified training (stratified over classes, not hospitals)
+        Next we'll train a model on it.
+        '''
+        train_file = pd.read_csv(Path(
+            Path.cwd() / 'data' / 'eicu' / 'trained.csv'), names=['hospital_id', 'train_bool'])
+        self.train_ids = train_file.loc[train_file['train_bool']
+                                        == True]['hospital_id'].tolist()
+        print(self.train_ids)
+        combined_dataset_list = list()
+        for i in self.train_ids:
+            combined_dataset_list.append(pd.read_parquet(Path(Path.cwd() / 'data' / 'eicu' / "hospital_{}".format(i) / 'clean_data' / 'INFO_DATASET_7days_creatinine2.parquet')))
+        combined_dataset = pd.concat(combined_dataset_list)
+        self.args.dbname = "{}".format('combined')
+        model_cfg = config(
+                self.args, runname="creatinine_model_" + self.args.dbname)
+        Path(model_cfg.cleaned_data_path()).mkdir(parents=True, exist_ok=True)
+        combined_dataset.to_parquet(Path.cwd() / 'data' /'eicu' / 'combined'/ 'combined_cleaned_dataset.parquet')
+        
+        aki_ml.run_aki_model(model_cfg, combined_dataset)
 
 
 if __name__ == "__main__":
@@ -463,7 +485,7 @@ if __name__ == "__main__":
                         help="validate ML model(s) on all dbs and verify results")
     parser.add_argument('-m', '--mode', help='define if we want to train on "local" or "global" datasets/hospitals', type=str,
                         choices=['local', 'global'], default='local')
-
+    parser.add_argument('-c', '--combine', help='combine the cleaned datasets', action="store_true")
     args = parser.parse_args()
     mode = args.mode
     print("starting in {} mode".format(mode))
@@ -481,6 +503,11 @@ if __name__ == "__main__":
         if(mode == 'local'):
             lf.validate_local_models()
         else:
-            lf.validate_global_model()
+            lf.args.dbname = "eicu"
+            lf.validate_global_model(name="global")
+    elif args.combine:
+        # lf.combine_datasets()
+        lf.args.dbname = "combined"
+        lf.validate_global_model(name="combined")
     else:
         logger.error("Unknown command: {}".format(args.command))
