@@ -24,7 +24,10 @@ class fakeArgsClass:
     fake class in order not to have to capture cmdline arguments for all hospitals.
     '''
     dbname = None
-    dbmodel = 'eicu'
+    dbmodel = None
+
+    def __init__(self, dbmodel):
+        self.dbmodel = dbmodel
 
 
 class local_flow():
@@ -240,7 +243,7 @@ class local_flow():
             458,
             459,
         ]
-        entire_set = ['eicu']
+        entire_set = ['eicu'] if args.dbmodel=='eicu' else ['mimic']
         self.args = args
         if(mode == 'local'):
             self.hospital_ids = hospital_ids
@@ -384,7 +387,7 @@ class local_flow():
                           "{}_auroc_comparison.csv".format(model_cfg.runname))
 
     def validate_local_models(self):
-        val_args = fakeArgsClass()
+        val_args = fakeArgsClass('eicu')
         # we'll iterate over the hospitals of which we've trained a model
         train_file = pd.read_csv(Path(
             Path.cwd() / 'data' / 'eicu' / 'trained.csv'), names=['hospital_id', 'train_bool'])
@@ -415,7 +418,7 @@ class local_flow():
                             'eicu' / 'auroc_local_matrix.html'))
 
     def validate_global_model(self, name):
-        val_args = fakeArgsClass()
+        val_args = fakeArgsClass('eicu')
         # we'll iterate over the hospitals of which we've trained a model
         train_file = pd.read_csv(Path(
             Path.cwd() / 'data' / 'eicu' / 'trained.csv'), names=['hospital_id', 'train_bool'])
@@ -469,7 +472,7 @@ class local_flow():
 if __name__ == "__main__":
     load_dotenv()
 
-    fakeArgs = fakeArgsClass()
+    fakeArgs = fakeArgsClass('eicu') # 'mimiciii'
 
     parser = argparse.ArgumentParser()
 
