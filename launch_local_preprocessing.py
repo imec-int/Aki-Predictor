@@ -31,7 +31,6 @@ class fakeArgsClass:
 
 
 class local_flow():
-
     def __init__(self, args, mode, train_threshold=10, train_test_split=0.2):
         hospital_ids = [
             56,
@@ -243,7 +242,7 @@ class local_flow():
             458,
             459,
         ]
-        entire_set = ['eicu'] if args.dbmodel=='eicu' else ['mimic']
+        entire_set = ['eicu'] if args.dbmodel == 'eicu' else ['mimic']
         self.args = args
         if(mode == 'local'):
             self.hospital_ids = hospital_ids
@@ -256,6 +255,9 @@ class local_flow():
         self.train_test_split = train_test_split
 
     def query_flow(self):
+        '''
+        loop over hospitals and query them
+        '''
         for i in self.hospital_ids:
             dbname = "{}{}".format(self.db_prefix, i)
             print("querying {}".format(dbname))
@@ -267,6 +269,9 @@ class local_flow():
             aki_psql.save_sql()
 
     def preprocess_thread(self, hospital_id, args, sema):
+        '''
+        thread to clean data
+        '''
         sema.acquire()
         args.dbname = "{}{}".format(self.db_prefix, hospital_id)
         print("preprocessing {}".format(args.dbname))
@@ -282,6 +287,9 @@ class local_flow():
         sema.release()
 
     def preprocess_flow(self):
+        '''
+        preprocess the data in multiple threads
+        '''
         threads = list()
         # we use a semaphore in order not to overload the CPU too much
         maxthreads = 20
@@ -296,8 +304,13 @@ class local_flow():
             thread.join()
 
     def insights(self):
+        '''
+        create insight files per hospital.
+        Insights are the amount of filtered patients per category in order to know how are dataset is composed.
+        '''
         insights_cols = ['hospital', 'creat_only_normal',
-                         'creat_only_AKI_1', 'creat_only_AKI_2', 'creat_only_AKI_3', 'creat+urine_normal', 'creat+urine_AKI_1', 'creat+urine_AKI_2', 'creat+urine_AKI_3']
+                         'creat_only_AKI_1', 'creat_only_AKI_2', 'creat_only_AKI_3', 'creat+urine_normal',
+                         'creat+urine_AKI_1', 'creat+urine_AKI_2', 'creat+urine_AKI_3']
         insights_list = list()
         for hospital_id in self.hospital_ids:
             self.args.dbname = "{}{}".format(self.db_prefix, hospital_id)
@@ -335,6 +348,10 @@ class local_flow():
             Path(Path.cwd() / 'data' / 'eicu' / 'insights_{}.csv'.format(mode)))
 
     def verify_further_processing(self, hospital_id) -> bool:
+        '''
+        function to decide which hospitals are eligible for further training and validating 
+        based on <train_threshold> as the minimum amount of "normal" persons and <train_test_split> as parameter for deciding the stratification
+        '''
         insights = pd.read_csv(
             Path(Path.cwd() / 'data' / 'eicu' / 'insights_{}.csv'.format(mode)))
         res_row = insights.loc[insights['hospital'] == hospital_id]
@@ -358,7 +375,7 @@ class local_flow():
 
     def ml_flow(self):
         """
-        we first have to iterate over all hospitals
+        train the model on either all individual hospitals, or on the global/combined model
         """
         # now we train the model per hospital_id
         for i in self.hospital_ids:
@@ -387,6 +404,9 @@ class local_flow():
                           "{}_auroc_comparison.csv".format(model_cfg.runname))
 
     def validate_local_models(self):
+        '''
+        create a matrix which validates each local matrix on the list of eligible hospitals
+        '''
         val_args = fakeArgsClass('eicu')
         # we'll iterate over the hospitals of which we've trained a model
         train_file = pd.read_csv(Path(
@@ -418,6 +438,9 @@ class local_flow():
                             'eicu' / 'auroc_local_matrix.html'))
 
     def validate_global_model(self, name):
+        '''
+        function to validate the global or combined model (based on <name>) on the hospital datasets which are eligible (trained.csv)
+        '''
         val_args = fakeArgsClass('eicu')
         # we'll iterate over the hospitals of which we've trained a model
         train_file = pd.read_csv(Path(
@@ -458,24 +481,25 @@ class local_flow():
         print(self.train_ids)
         combined_dataset_list = list()
         for i in self.train_ids:
-            combined_dataset_list.append(pd.read_parquet(Path(Path.cwd() / 'data' / 'eicu' / "hospital_{}".format(i) / 'clean_data' / 'INFO_DATASET_7days_creatinine2.parquet')))
+            combined_dataset_list.append(pd.read_parquet(Path(Path.cwd(
+            ) / 'data' / 'eicu' / "hospital_{}".format(i) / 'clean_data' / 'INFO_DATASET_7days_creatinine2.parquet')))
         combined_dataset = pd.concat(combined_dataset_list)
         self.args.dbname = "{}".format('combined')
         model_cfg = config(
-                self.args, runname="creatinine_model_" + self.args.dbname)
+            self.args, runname="creatinine_model_" + self.args.dbname)
         Path(model_cfg.cleaned_data_path()).mkdir(parents=True, exist_ok=True)
-        combined_dataset.to_parquet(Path.cwd() / 'data' /'eicu' / 'combined'/ 'combined_cleaned_dataset.parquet')
-        
+        combined_dataset.to_parquet(
+            Path.cwd() / 'data' / 'eicu' / 'combined' / 'combined_cleaned_dataset.parquet')
+
         aki_ml.run_aki_model(model_cfg, combined_dataset)
 
 
 if __name__ == "__main__":
     load_dotenv()
 
-    fakeArgs = fakeArgsClass('eicu') # 'mimiciii'
+    fakeArgs = fakeArgsClass('eicu')  # 'mimiciii'
 
     parser = argparse.ArgumentParser()
-
     parser.add_argument('-q', '--query', action="store_true",
                         help="send out query requests to all dbs")
     parser.add_argument('-pp', '--preprocess', action="store_true",
@@ -488,7 +512,8 @@ if __name__ == "__main__":
                         help="validate ML model(s) on all dbs and verify results")
     parser.add_argument('-m', '--mode', help='define if we want to train on "local" or "global" datasets/hospitals', type=str,
                         choices=['local', 'global'], default='local')
-    parser.add_argument('-c', '--combine', help='combine the cleaned datasets', action="store_true")
+    parser.add_argument(
+        '-c', '--combine', help='combine the cleaned datasets', action="store_true")
     args = parser.parse_args()
     mode = args.mode
     print("starting in {} mode".format(mode))
@@ -509,7 +534,7 @@ if __name__ == "__main__":
             lf.args.dbname = "eicu"
             lf.validate_global_model(name="global")
     elif args.combine:
-        # lf.combine_datasets()
+        lf.combine_datasets()
         lf.args.dbname = "combined"
         lf.validate_global_model(name="combined")
     else:
